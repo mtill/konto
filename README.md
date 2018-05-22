@@ -2,9 +2,9 @@
 web based HBCI banking software
 
 ## how to install
-place these libraries into the "static" folder:
-* jquery (http://jquery.com/)
-* plotly for javascript (https://plot.ly/javascript/)
+* pip3 install bottle (https://bottlepy.org/)
+* jquery (http://jquery.com/) -- put this library into the "static" folder
+* plotly for javascript (https://plot.ly/javascript/) -- put this library into the "static" folder
 
 ## how to use
 * python3 index.py dev
