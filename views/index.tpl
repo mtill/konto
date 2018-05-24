@@ -1,5 +1,7 @@
 <!DOCTYPE html>
 
+% import datetime
+
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -124,8 +126,10 @@ $(document).ready(function(){
 
 % include('menu.tpl', site=site)
 
-von: <input type="date" id="fromDate" value="1970-01-01">
-bis: <input type="date" id="toDate" value="2099-01-01">
+% fromDate = (datetime.datetime.today() - datetime.timedelta(days=5*30)).replace(day=1).strftime('%Y-%m-%d')
+% toDate = datetime.datetime.today().strftime('%Y-%m-%d')
+von: <input type="date" id="fromDate" value="{{fromDate}}">
+bis: <input type="date" id="toDate" value="{{toDate}}">
 <input type="button" value="ok" onclick="doPlot(true)" style="margin-right:2em">
 
 <a href="javascript:doPlot(false)" style="font-size:10pt">Umsätze aktualisieren</a>
