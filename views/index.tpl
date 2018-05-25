@@ -90,7 +90,11 @@ function doPlot(storeValues) {
   $.ajax({
          type: "POST",
          url: "/getConsolidated",
+         % if byCategory == 'year':
+         data: JSON.stringify({byCategory: "{{byCategory}}", traces: {{! tracesJSON}}}),
+         % else:
          data: JSON.stringify({byCategory: "{{byCategory}}", traces: {{! tracesJSON}}, fromDate: fromDate, toDate: toDate}),
+         % end
          success: function(thedata) {
            plotData = thedata;
            if (plotData["foundDuplicates"].length != 0) {
@@ -143,11 +147,13 @@ $(document).ready(function(){
 
 % include('menu.tpl', site=site)
 
-% fromDate = (datetime.datetime.today() - datetime.timedelta(days=5*30)).replace(day=1).strftime('%Y-%m-%d')
-% toDate = datetime.datetime.today().strftime('%Y-%m-%d')
+% if byCategory != 'year':
+%   fromDate = (datetime.datetime.today() - datetime.timedelta(days=5*30)).replace(day=1).strftime('%Y-%m-%d')
+%   toDate = datetime.datetime.today().strftime('%Y-%m-%d')
 von: <input type="date" id="fromDate" value="{{fromDate}}">
 bis: <input type="date" id="toDate" value="{{toDate}}">
 <input type="button" value="ok" onclick="doPlot(true)" style="margin-right:2em">
+% end
 
 <a href="javascript:doPlot(false)" style="font-size:10pt">Umsätze aktualisieren</a>
 <div id="inout"></div>

@@ -41,8 +41,17 @@ def getConsolidated():
     categories = konto.parseCategories()
     byCategory = request.json.get('byCategory')
     traces = request.json.get('traces')
-    fromDate = time.strptime(request.json.get('fromDate'), '%Y-%m-%d')
-    toDate = time.strptime(request.json.get('toDate'), '%Y-%m-%d')
+
+    fromDateJSON = request.json.get('fromDate', None)
+    fromDate = None
+    if fromDateJSON is not None:
+        fromDate = time.strptime(fromDateJSON, '%Y-%m-%d')
+
+    toDateJSON = request.json.get('toDate', None)
+    toDate = None
+    if toDateJSON is not None:
+        toDate = time.strptime(toDateJSON, '%Y-%m-%d')
+
     consolidated = konto.getConsolidated(byCategory=byCategory, traceNames=traces, fromDate=fromDate, categories=categories, toDate=toDate)
 
     # return json.dumps(request.json.get('items'))
@@ -59,8 +68,17 @@ def getDetails():
     theX = request.json.get('theX')
     categories = konto.parseCategories()
     byCategory = request.json.get('byCategory')
-    fromDate = time.strptime(request.json.get('fromDate'), '%Y-%m-%d')
-    toDate = time.strptime(request.json.get('toDate'), '%Y-%m-%d')
+
+    fromDateJSON = request.json.get('fromDate', None)
+    fromDate = None
+    if fromDateJSON is not None:
+        fromDate = time.strptime(fromDateJSON, '%Y-%m-%d')
+
+    toDateJSON = request.json.get('toDate', None)
+    toDate = None
+    if toDateJSON is not None:
+        toDate = time.strptime(toDateJSON, '%Y-%m-%d')
+
     consolidated = konto.getConsolidated(byCategory=byCategory, traceNames=['scatter'], fromDate=fromDate, categories=categories, toDate=toDate)
 
     return template('categorize.tpl', title=template("Umsätze für {{theX}}", theX=theX), theX=theX, scatter=consolidated['scatter'])
