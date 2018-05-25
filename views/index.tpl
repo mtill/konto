@@ -26,15 +26,19 @@ function inoutPlot() {
   traces = plotData["traces"];
   Plotly.purge("inout")
 
-  % dtick = 'M12' if byCategory == 'year' else 'M1'
+  % if byCategory == 'year':
+  %   dtick = 'M12'
+  % else:
+  %   dtick = 'M1'
+  % end
 
-  var firstDate = traces[0]['x'][0];
-  for (var i = 1; i < traces.length; i++) {
-    if (firstDate > traces[i]['x'][0]) {
-      firstDate = traces[i]['x'][0];
-    }
-  }
-  firstDate = firstDate + "-01"
+//  var firstDate = traces[0]['x'][0];
+//  for (var i = 1; i < traces.length; i++) {
+//    if (firstDate > traces[i]['x'][0]) {
+//      firstDate = traces[i]['x'][0];
+//    }
+//  }
+//  firstDate = firstDate + "-01"
 
   //inout = temperature.sort(function(a,b) {return a.name.localeCompare(b.name)});
   //inout = Plotly.newPlot("temperature", temperature, {title: "Temperatur", xaxis: {range:[theDate+" 00:00:00", theDate+" 23:59:59"]}, yaxis: {title: "Temperatur [°C]"}}, {displaylogo: false});
@@ -44,7 +48,7 @@ function inoutPlot() {
                            //hovermode: "closest",
                            barmode: "stack",
                            xaxis: {
-                             tick0: firstDate,
+                             // tick0: firstDate,
                              dtick: "{{dtick}}"
                            },
                            yaxis: {title: "Euro"},
