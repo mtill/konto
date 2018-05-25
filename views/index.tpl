@@ -14,9 +14,11 @@
 
 <script class="code" type="text/javascript">
 var windowWidth = null;
+var plotData = null;
+% if byCategory != 'year':
 var fromDate = null;
 var toDate = null;
-var plotData = null;
+% end
 
 function onItemCategorized(theid) {
   // doPlot(false);
@@ -81,10 +83,12 @@ function doPlot(storeValues) {
   //  items.push($(this).val());
   //});
 
+  % if byCategory != 'year':
   if (storeValues) {
     fromDate = $('#fromDate').val();
     toDate = $('#toDate').val();
   }
+  % end
 
   $('#duplicates').html("").hide();
   $.ajax({
@@ -112,7 +116,11 @@ function showDetails(theX) {
   $.ajax({
     type: "POST",
     url: "/getDetails",
+    % if byCategory == 'year':
+    data: JSON.stringify({theX: theX, byCategory: "{{byCategory}}", traces: ['scatter']}),
+    % else:
     data: JSON.stringify({theX: theX, byCategory: "{{byCategory}}", traces: ['scatter'], fromDate: fromDate, toDate: toDate}),
+    % end
     success: function(thedata) {
       $("#details").html(thedata);
     },
