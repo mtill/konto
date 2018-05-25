@@ -119,8 +119,10 @@ $(document).ready(function(){
 
   doPlot(true);
 
-  % currentMonth = datetime.datetime.today().strftime('%Y-%m')
+  % if byCategory == 'month':
+  %   currentMonth = datetime.datetime.today().strftime('%Y-%m')
   showDetails("{{currentMonth}}")
+  % end
 });
 </script>
 
@@ -140,6 +142,6 @@ bis: <input type="date" id="toDate" value="{{toDate}}">
 <p id="duplicates"></p>
 <p id="details"></p>
 
-<p style="color: lightgray;margin-top: 3em;margin-left:1em">konto &mdash; &copy;<a href="http://www.michaeltillbeck.de" target="_blank" style="text-decoration:none;color: lightgray">Michael Till Beck</a>, 2018</p>
+<p style="color: lightgray;margin-top: 3em;margin-left:1em">konto &mdash; &copy;<a href="https://github.com/mtill/konto" target="_blank" style="text-decoration:none;color: lightgray">Michael Till Beck</a>, 2018</p>
 </body>
 </html>
