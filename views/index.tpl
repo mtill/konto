@@ -2,6 +2,8 @@
 
 % import datetime
 
+% showDateSelector = byCategory != 'year'
+
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -15,13 +17,19 @@
 <script class="code" type="text/javascript">
 var windowWidth = null;
 var plotData = null;
-% if byCategory != 'year':
+
+% if showDateSelector:
 var fromDate = null;
 var toDate = null;
+
+function storeDates() {
+  fromDate = $("#fromDate").val();
+  toDate = $("#toDate").val();
+}
 % end
 
 function onItemCategorized(theid) {
-  // doPlot(false);
+  // doPlot();
 }
 
 function inoutPlot() {
@@ -54,20 +62,20 @@ function inoutPlot() {
                              dtick: "{{dtick}}"
                            },
                            yaxis: {title: "Euro"},
-                           legend: {traceorder: 'normal'}
+                           legend: {traceorder: "normal"}
                           },
                           {
                             displaylogo: false
                           });
 
-  document.getElementById("inout").on('plotly_click', function(eventdata) {
+  document.getElementById("inout").on("plotly_click", function(eventdata) {
     for (var i=0; i < eventdata.points.length; i++) {
       var curveNumber = eventdata.points[i].curveNumber;
       var xPos = 0;
-      if ('theX' in traces[curveNumber]) {
-        xPos = traces[curveNumber]['theX'][eventdata.points[i].pointNumber];
+      if ("theX" in traces[curveNumber]) {
+        xPos = traces[curveNumber]["theX"][eventdata.points[i].pointNumber];
       } else {
-        xPos = traces[curveNumber]['x'][eventdata.points[i].pointNumber];
+        xPos = traces[curveNumber]["x"][eventdata.points[i].pointNumber];
       }
 
       showDetails(xPos);
@@ -77,37 +85,30 @@ function inoutPlot() {
   });
 }
 
-function doPlot(storeValues) {
+function doPlot() {
   //var items = new Array();
   //$('#filesSelect option:selected').each(function() {
   //  items.push($(this).val());
   //});
 
-  % if byCategory != 'year':
-  if (storeValues) {
-    fromDate = $('#fromDate').val();
-    toDate = $('#toDate').val();
-  }
-  % end
-
   $('#duplicates').html("").hide();
   $.ajax({
          type: "POST",
          url: "/getConsolidated",
-         % if byCategory == 'year':
-         data: JSON.stringify({byCategory: "{{byCategory}}", traces: {{! tracesJSON}}}),
-         % else:
+         % if showDateSelector:
          data: JSON.stringify({byCategory: "{{byCategory}}", traces: {{! tracesJSON}}, fromDate: fromDate, toDate: toDate}),
+         % else:
+         data: JSON.stringify({byCategory: "{{byCategory}}", traces: {{! tracesJSON}}}),
          % end
          success: function(thedata) {
            plotData = thedata;
            if (plotData["foundDuplicates"].length != 0) {
-             $('#duplicates').html("<h2>Mögliche Duplikate gefunden:</h2>\n" + plotData["foundDuplicates"].join('<br>\n')).show();
+             $("#duplicates").html("<h2>Mögliche Duplikate gefunden:</h2>\n" + plotData["foundDuplicates"].join('<br>\n')).show();
            }
            inoutPlot();
          },
-         dataType: 'json',
-         contentType: 'application/json; charset=utf-8'
+         dataType: "json",
+         contentType: "application/json; charset=utf-8"
        });
 }
 
@@ -116,20 +117,20 @@ function showDetails(theX) {
   $.ajax({
     type: "POST",
     url: "/getDetails",
-    % if byCategory == 'year':
-    data: JSON.stringify({theX: theX, byCategory: "{{byCategory}}", traces: ['scatter']}),
-    % else:
+    % if showDateSelector:
     data: JSON.stringify({theX: theX, byCategory: "{{byCategory}}", traces: ['scatter'], fromDate: fromDate, toDate: toDate}),
+    % else:
+    data: JSON.stringify({theX: theX, byCategory: "{{byCategory}}", traces: ['scatter']}),
     % end
     success: function(thedata) {
       $("#details").html(thedata);
     },
-    contentType: 'application/json; charset=utf-8'
+    contentType: "application/json; charset=utf-8"
   });
 }
 
 function refresh() {
-  doPlot(false);
+  doPlot();
 }
 
 $(document).ready(function(){
@@ -137,11 +138,14 @@ $(document).ready(function(){
 
   // $(window).resize(function(){
   //   if ($(document).width() != windowWidth) {
-  //     doPlot(false);
+  //     doPlot();
   //   }
   // });
 
-  doPlot(true);
+  % if showDateSelector:
+  storeDates();
+  % end
+  doPlot();
 
   % if byCategory == 'month':
   %   currentMonth = datetime.datetime.today().strftime('%Y-%m')
@@ -155,15 +159,15 @@ $(document).ready(function(){
 
 % include('menu.tpl', site=site)
 
-% if byCategory != 'year':
+% if showDateSelector:
 %   fromDate = (datetime.datetime.today() - datetime.timedelta(days=5*30)).replace(day=1).strftime('%Y-%m-%d')
 %   toDate = datetime.datetime.today().strftime('%Y-%m-%d')
 von: <input type="date" id="fromDate" value="{{fromDate}}">
 bis: <input type="date" id="toDate" value="{{toDate}}">
-<input type="button" value="ok" onclick="doPlot(true)" style="margin-right:2em">
+<input type="button" value="ok" onclick="storeDates(); doPlot()" style="margin-right:2em">
 % end
 
-<a href="javascript:doPlot(false)" style="font-size:10pt">Umsätze aktualisieren</a>
+<a href="javascript:doPlot()" style="font-size:10pt">Umsätze aktualisieren</a>
 <div id="inout"></div>
 <p id="duplicates"></p>
 <p id="details"></p>
