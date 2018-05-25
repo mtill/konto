@@ -11,6 +11,10 @@
     function onItemCategorized(theid) {
       $('#entry-' + theid).hide();
     }
+
+    $(document).ready(function() {
+      insertCategories();
+    });
   </script>
  </head>
  <body>
@@ -19,13 +23,13 @@
 
   <form action="/editCategories" method="POST">
    <p>
-<textarea name="categories" rows="20" cols="80">{{categories}}</textarea>
+<textarea name="categories" rows="20" cols="80">{{categoriesRaw}}</textarea>
   </p>
    <input type="submit" value="Speichern">
   </form>
 
-% include('categorize.tpl', scatter=uncategorized, theX=None, title="Umsätze ohne Kategorie:")
+% include('categorize.tpl', scatter=uncategorized, allcategoriesNames=allcategoriesNames, theX=None, title="Umsätze ohne Kategorie:")
 
-  <p style="color: lightgray;margin-top: 3em;margin-left:1em">konto &mdash; &copy;<a href="http://www.michaeltillbeck.de" target="_blank" style="text-decoration:none;color: lightgray">Michael Till Beck</a>, 2018</p>
+  <p style="color: lightgray;margin-top: 3em;margin-left:1em">konto &mdash; &copy;<a href="https://github.com/mtill/konto" target="_blank" style="text-decoration:none;color: lightgray">Michael Till Beck</a>, 2018</p>
  </body>
 </html>

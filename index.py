@@ -27,9 +27,9 @@ def server_static(thefilename):
 
 @app.route('/editCategories', method='GET')
 def editCategories(thefilename='categories'):
-    categories = konto.readCategoriesFile()
+    categoriesRaw = konto.readCategoriesFile()
     uncategorized = konto.getUncategorizedItems()
-    return template('editCategories.tpl', categories=categories, uncategorized=uncategorized)
+    return template('editCategories.tpl', categoriesRaw=categoriesRaw, allcategoriesNames=uncategorized['allcategoriesNames'], uncategorized=uncategorized['items'])
 
 @app.route('/editCategories', method='POST')
 def submitCategories():
@@ -80,8 +80,7 @@ def getDetails():
         toDate = time.strptime(toDateJSON, '%Y-%m-%d')
 
     consolidated = konto.getConsolidated(byCategory=byCategory, traceNames=['scatter'], fromDate=fromDate, categories=categories, toDate=toDate)
-
-    return template('categorize.tpl', title=template("Umsätze für {{theX}}", theX=theX), theX=theX, scatter=consolidated['scatter'])
+    return template('categorize.tpl', title=template("Umsätze für {{theX}}", theX=theX), theX=theX, allcategoriesNames=consolidated['allcategoriesNames'], scatter=consolidated['scatter'])
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == 'dev':

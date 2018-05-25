@@ -1,16 +1,38 @@
+var allcategoriesNames = [];
+
+function insertCategories() {
+  var theCatList = $("#catlist");
+  theCatList.empty();
+  for (var i = 0; i < allcategoriesNames.length; i++) {
+    var newOption = $("<option>");
+    newOption.val(allcategoriesNames[i]);
+    theCatList.append(newOption);
+  }
+}
+
 function categorize(theid, successFunction) {
+  var theValue = $("#item-" + theid).val();
+
+  if (allcategoriesNames.indexOf(theValue) == -1) {
+    allcategoriesNames.push(theValue);
+    catlistValues = allcategoriesNames.sort(function (a, b) {
+      return a.toLowerCase().localeCompare(b.toLowerCase());
+    }); // thats not very efficient.
+
+    insertCategories();
+  }
+
   $("#button-" + theid).hide();
-  var theValue = $('#item-' + theid).val();
   $.ajax({
          type: "POST",
          url: "/categorize",
          data: JSON.stringify({itemId: theid, thecategory: theValue}),
          success: function(data) {
+           $("#button-" + theid).hide();
            onItemCategorized(theid);
          },
-         contentType: 'application/json; charset=utf-8'
+         contentType: "application/json; charset=utf-8"
        });
-
 }
 
 function activateButton(theid) {

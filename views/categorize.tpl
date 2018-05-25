@@ -1,4 +1,14 @@
 <h2>{{title}}</h2>
+
+% import json
+
+<datalist id="catlist">
+</datalist>
+
+<script class="code" type="text/javascript">
+  allcategoriesNames = {{! json.dumps(allcategoriesNames)}};
+</script>
+
 <table>
   <tr><th>Datum</th><th>Name</th><th>Beschreibung</th><th>Betrag</th><th>Kategorie</th></tr>
 
@@ -18,7 +28,7 @@
       <td title="{{title}}">{{shorttitle}}</td>
       <td>{{amountcurrency}}</td>
       <td>
-        <input type="text" id="item-{{theid}}" origValue="{{thecategory}}" value="{{thecategory}}" onkeyup="isEnter(event, '{{theid}}')" oninput="activateButton('{{theid}}')">
+        <input type="text" id="item-{{theid}}" origValue="{{thecategory}}" list="catlist" value="{{thecategory}}" onkeyup="isEnter(event, '{{theid}}')" oninput="activateButton('{{theid}}')">
         <img src="/static/ok.png" id="button-{{theid}}" style="display:none" onclick="categorize('{{theid}}')">
       </td>
     </tr>

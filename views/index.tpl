@@ -124,6 +124,7 @@ function showDetails(theX) {
     % end
     success: function(thedata) {
       $("#details").html(thedata);
+      insertCategories();
     },
     contentType: "application/json; charset=utf-8"
   });
@@ -133,7 +134,7 @@ function refresh() {
   doPlot();
 }
 
-$(document).ready(function(){
+$(document).ready(function() {
   windowWidth=$(document).width();
 
   // $(window).resize(function(){

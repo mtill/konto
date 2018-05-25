@@ -60,12 +60,12 @@ def parseListLine(line):
         return None
 
     linesplit = line.split(';')
-    if len(linesplit) != 6:
-        raise Exception('invalid data format')
+    # if len(linesplit) != 6:
+    #     raise Exception('invalid data format')
     currency = linesplit[2].strip()
     if currency != '€':
         raise Exception('unknown currency ' + currency)
-    thecategory = linesplit[5].strip()
+    thecategory = ';'.join(linesplit[5:]).strip()
 
     return {'date': linesplit[0].strip().replace('/', '-'),
             'amount': float(linesplit[1].strip()),
@@ -106,6 +106,11 @@ def getConsolidated(byCategory, traceNames, fromDate, toDate, categories, thepat
     duplicatesMap = {}
     foundDuplicates = []
 
+    allcategoriesNames = []
+    for c in categories:
+        if c['category'] not in allcategoriesNames:
+            allcategoriesNames.append(c['category'])
+
     scatterlist = []
     allcategories = {}
     sumdict = {}
@@ -119,6 +124,9 @@ def getConsolidated(byCategory, traceNames, fromDate, toDate, categories, thepat
             else:
                 duplicatesMap[dupLine] = True
             f['category'] = findCategory(theitem=f, categories=categories)
+        else:
+            if f['category'] not in allcategoriesNames:
+                allcategoriesNames.append(f['category'])
 
         thedate = time.strptime(f['date'], '%Y-%m-%d')
         theX = f['date']
@@ -202,6 +210,7 @@ def getConsolidated(byCategory, traceNames, fromDate, toDate, categories, thepat
             scatter['theX'].append(x['theX'])
         result['scatter'] = scatter
 
+    result['allcategoriesNames'] = sorted(allcategoriesNames, key=lambda x: x.lower())
     return result
 
 def updateCategory(itemId, thecategory, thepath='lists/'):
@@ -233,15 +242,19 @@ def getUncategorizedItems():
     categories = parseCategories()
     consolidated = getConsolidated(byCategory='month', traceNames=['scatter'], fromDate=None, categories=categories, toDate=None)
     scatter = consolidated['scatter']
-    result = {'date': [], 'id': [], 'amount': [], 'category': [], 'currency': [], 'name': [], 'title': [], 'theX': []}
+
+    result = {}
+    result['allcategoriesNames'] = consolidated['allcategoriesNames']
+    resultItems = {'date': [], 'id': [], 'amount': [], 'category': [], 'currency': [], 'name': [], 'title': [], 'theX': []}
     for i in range(0, len(scatter['date'])):
         if scatter['category'][i] == '' or scatter['category'][i] == 'nicht kategorisiert':
-            result['date'].append(scatter['date'][i])
-            result['id'].append(scatter['id'][i])
-            result['amount'].append(scatter['amount'][i])
-            result['currency'].append(scatter['currency'][i])
-            result['category'].append(scatter['category'][i])
-            result['name'].append(scatter['name'][i])
-            result['title'].append(scatter['title'][i])
-            result['theX'].append(scatter['theX'][i])
+            resultItems['date'].append(scatter['date'][i])
+            resultItems['id'].append(scatter['id'][i])
+            resultItems['amount'].append(scatter['amount'][i])
+            resultItems['currency'].append(scatter['currency'][i])
+            resultItems['category'].append(scatter['category'][i])
+            resultItems['name'].append(scatter['name'][i])
+            resultItems['title'].append(scatter['title'][i])
+            resultItems['theX'].append(scatter['theX'][i])
+    result['items'] = resultItems
     return result
