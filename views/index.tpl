@@ -118,6 +118,9 @@ $(document).ready(function(){
   // });
 
   doPlot(true);
+
+  % currentMonth = datetime.datetime.today().strftime('%Y-%m')
+  showDetails("{{currentMonth}}")
 });
 </script>
 

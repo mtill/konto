@@ -2,7 +2,7 @@
 <table>
   <tr><th>Datum</th><th>Name</th><th>Beschreibung</th><th>Betrag</th><th>Kategorie</th></tr>
 
-% for i in range(0, len(scatter['date'])):
+% for i in range(len(scatter['date']) - 1, -1, -1):
   % if theX is None or scatter['theX'][i] == theX:
     % date = scatter['date'][i]
     % name = scatter['name'][i]
