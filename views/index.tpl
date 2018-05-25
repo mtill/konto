@@ -6,7 +6,7 @@
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <title>konto - Übersicht</title>
-  <link rel="stylesheet" type="text/css" href="/static/menu.css">
+  <link rel="stylesheet" type="text/css" href="/static/style.css">
   <script class="include" type="text/javascript" src="/static/jquery-3.3.1.min.js"></script>
   <script class="include" type="text/javascript" src="/static/categorize.js"></script>
   <script src="/static/plotly-latest.min.js"></script>

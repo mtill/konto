@@ -1,5 +1,6 @@
 <h2>{{title}}</h2>
 <table>
+  <tr><th>Datum</th><th>Name</th><th>Beschreibung</th><th>Betrag</th><th>Kategorie</th></tr>
 
 % for i in range(0, len(scatter['date'])):
   % if theX is None or scatter['theX'][i] == theX:
@@ -8,7 +9,7 @@
     % shortname = scatter['name'][i][0:15]
     % title = scatter['title'][i]
     % theid = scatter['id'][i]
-    % shorttitle = scatter['title'][i][0:15]
+    % shorttitle = scatter['title'][i][0:30]
     % amountcurrency = str(scatter['amount'][i]) + scatter['currency'][i]
     % thecategory = '' if scatter['category'][i] == 'nicht kategorisiert' else scatter['category'][i]
     <tr id="entry-{{theid}}">
