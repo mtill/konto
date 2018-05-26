@@ -45,8 +45,8 @@ function activateButton(theid) {
   }
 }
 
-function isEnter(event, theid) {
-  if (event.keyCode == 13) {
-    categorize(theid);
-  }
-}
+// function isConfirmed(event, theid) {
+//   if (event.keyCode == 13) {
+//     categorize(theid);
+//   }
+// }

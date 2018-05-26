@@ -28,7 +28,7 @@
       <td title="{{title}}">{{shorttitle}}</td>
       <td>{{amountcurrency}}</td>
       <td>
-        <input type="text" id="item-{{theid}}" origValue="{{thecategory}}" list="catlist" value="{{thecategory}}" onkeyup="isEnter(event, '{{theid}}')" oninput="activateButton('{{theid}}')">
+        <input type="text" id="item-{{theid}}" origValue="{{thecategory}}" list="catlist" value="{{thecategory}}" oninput="activateButton('{{theid}}')">
         <img src="/static/ok.png" id="button-{{theid}}" style="display:none" onclick="categorize('{{theid}}')">
       </td>
     </tr>
