@@ -91,7 +91,8 @@ function doPlot() {
   //  items.push($(this).val());
   //});
 
-  $('#duplicates').html("").hide();
+  $('#duplicates').html("");
+  $("#inout").html("<h2>Lade Daten ...</h2>");
   $.ajax({
          type: "POST",
          url: "/getConsolidated",
@@ -101,6 +102,7 @@ function doPlot() {
          data: JSON.stringify({byCategory: "{{byCategory}}", traces: {{! tracesJSON}}}),
          % end
          success: function(thedata) {
+           $("#inout").html("");
            plotData = thedata;
            if (plotData["foundDuplicates"].length != 0) {
              $("#duplicates").html("<h2>Mögliche Duplikate gefunden:</h2>\n" + plotData["foundDuplicates"].join('<br>\n')).show();
@@ -113,7 +115,7 @@ function doPlot() {
 }
 
 function showDetails(theX) {
-  $("#details").html("");
+  $("#details").html("<h2>Lade Details ...</h2>");
   $.ajax({
     type: "POST",
     url: "/getDetails",

@@ -22,14 +22,12 @@ function categorize(theid, successFunction) {
     insertCategories();
   }
 
-  $("#button-" + theid).hide();
+  $("#button-" + theid).addClass("dontshow");
   $.ajax({
          type: "POST",
          url: "/categorize",
          data: JSON.stringify({itemId: theid, thecategory: theValue}),
          success: function(data) {
-           $("#button-" + theid).hide();
-           $("#item-" + theid).attr("origValue", theValue);
            onItemCategorized(theid);
          },
          contentType: "application/json; charset=utf-8"
@@ -42,13 +40,6 @@ function isConfirmed(event, theid) {
     return false;
   }
 
-  var theItem = $("#item-" + theid);
-  var theButton = $("#button-" + theid);
-  if (theItem.attr("origValue") != theItem.val()) {
-    theButton.show();
-  } else {
-    theButton.hide();
-  }
-
+  $("#button-" + theid).removeClass("dontshow");
   return true;
 }
