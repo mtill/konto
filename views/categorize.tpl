@@ -29,7 +29,7 @@
       <td>{{amountcurrency}}</td>
       <td>
         <input type="text" id="item-{{theid}}" list="catlist" value="{{thecategory}}" onkeyup="isConfirmed(event, '{{theid}}')">
-        <img src="/static/ok.png" id="button-{{theid}}" class="dontshow" onclick="categorize('{{theid}}')">
+        <img src="/static/ok.png" id="button-{{theid}}" class="clickable dontshow" onclick="categorize('{{theid}}')">
       </td>
     </tr>
   %end
