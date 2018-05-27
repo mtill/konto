@@ -215,7 +215,15 @@ def getConsolidated(byCategory, traceNames, fromDate, toDate, categories, thepat
 
 def updateCategory(itemId, thecategory, thepath='lists/'):
     thefilenames = getLists(thepath)
+    fileIdPos = itemId.rfind('_')
+    if fileIdPos == -1:
+        raise Exception('invalid id')
+    fileId = itemId[0:fileIdPos]
+
     for thefilename in thefilenames:
+        if not thefilename.startswith(fileId):
+            continue
+
         content = parseFile(thefilename, thepath=thepath)
         for c in content:
             if c['id'] == itemId:
