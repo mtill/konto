@@ -7,6 +7,7 @@
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>konto - Übersicht</title>
   <link rel="stylesheet" type="text/css" href="/static/style.css">
   <script class="include" type="text/javascript" src="/static/jquery-3.3.1.min.js"></script>
@@ -17,16 +18,22 @@
 <script class="code" type="text/javascript">
 var windowWidth = null;
 var plotData = null;
-
-% if showDateSelector:
-var fromDate = null;
-var toDate = null;
+detailsParams["byCategory"] = "{{byCategory}}";
 
 function storeDates() {
-  fromDate = $("#fromDate").val();
-  toDate = $("#toDate").val();
+  % if showDateSelector:
+  detailsParams["fromDate"] = $("#fromDate").val();
+  detailsParams["toDate"] = $("#toDate").val();
+  % end
+
+  detailsParams["accounts"] = [];
+  $(".accountCheckbox").each(function() {
+    if ($(this).prop("checked")) {
+      detailsParams["accounts"].push($(this).val());
+    }
+  });
+  detailsParams["patternInput"] = $("#patternInput").val();
 }
-% end
 
 function onItemCategorized(theid) {
   // doPlot();
@@ -78,7 +85,10 @@ function inoutPlot() {
         xPos = traces[curveNumber]["x"][eventdata.points[i].pointNumber];
       }
 
-      showDetails(xPos);
+      detailsParams["theX"] = xPos;
+      detailsParams["byCategory"] = "{{byCategory}}";
+
+      showDetails(detailsParams);
       break;
     }
     // console.log(traces.points[i].curveNumber + "  "  + traces.points[i].pointNumber);
@@ -95,11 +105,13 @@ function doPlot() {
   $.ajax({
          type: "POST",
          url: "/getConsolidated",
-         % if showDateSelector:
-         data: JSON.stringify({byCategory: "{{byCategory}}", traces: {{! tracesJSON}}, fromDate: fromDate, toDate: toDate}),
-         % else:
-         data: JSON.stringify({byCategory: "{{byCategory}}", traces: {{! tracesJSON}}}),
-         % end
+         data: JSON.stringify({byCategory: "{{byCategory}}",
+                               traces: {{! tracesJSON}},
+                               fromDate: detailsParams["fromDate"],
+                               toDate: detailsParams["toDate"],
+                               accounts: detailsParams["accounts"],
+                               patternInput: detailsParams["patternInput"]
+                             }),
          success: function(thedata) {
            plotData = thedata;
            if (plotData["foundDuplicates"].length != 0) {
@@ -112,26 +124,15 @@ function doPlot() {
        });
 }
 
-function showDetails(theX) {
-  $("#details").html("<h2>Lade Details ...</h2>");
-  $.ajax({
-    type: "POST",
-    url: "/getDetails",
-    % if showDateSelector:
-    data: JSON.stringify({theX: theX, byCategory: "{{byCategory}}", traces: ['scatter'], fromDate: fromDate, toDate: toDate}),
-    % else:
-    data: JSON.stringify({theX: theX, byCategory: "{{byCategory}}", traces: ['scatter']}),
-    % end
-    success: function(thedata) {
-      $("#details").html(thedata);
-      insertCategories();
-    },
-    contentType: "application/json; charset=utf-8"
-  });
-}
-
 function refresh() {
   doPlot();
+}
+
+function submitSettingsForm() {
+  storeDates();
+  doPlot();
+  showDetails(detailsParams);
+  return false;
 }
 
 $(document).ready(function() {
@@ -143,14 +144,13 @@ $(document).ready(function() {
   //   }
   // });
 
-  % if showDateSelector:
   storeDates();
-  % end
   doPlot();
 
   % if byCategory == 'month':
   %   currentMonth = datetime.datetime.today().strftime('%Y-%m')
-  showDetails("{{currentMonth}}")
+  detailsParams["theX"] = "{{currentMonth}}";
+  showDetails(detailsParams);
   % end
 });
 </script>
@@ -160,15 +160,30 @@ $(document).ready(function() {
 
 % include('menu.tpl', site=site)
 
-% if showDateSelector:
-%   fromDate = (datetime.datetime.today() - datetime.timedelta(days=5*30)).replace(day=1).strftime('%Y-%m-%d')
-%   toDate = datetime.datetime.today().strftime('%Y-%m-%d')
-von: <input type="date" id="fromDate" value="{{fromDate}}">
-bis: <input type="date" id="toDate" value="{{toDate}}">
-<input type="button" value="ok" onclick="storeDates(); doPlot()" style="margin-right:2em">
-% end
+<fieldset style="margin-top: 0.5em">
 
-<a href="javascript:doPlot()" style="font-size:10pt">Umsätze aktualisieren</a>
+  <form onsubmit="return submitSettingsForm()">
+    <legend>Einstellungen</legend>
+    <span style="margin-right: 2em">
+      % for a in accounts:
+      <input type="checkbox" class="accountCheckbox" checked value="{{a}}">{{a}}
+      % end
+    </span>
+
+    % if showDateSelector:
+    %   fromDate = (datetime.datetime.today() - datetime.timedelta(days=5*30)).replace(day=1).strftime('%Y-%m-%d')
+    %   toDate = datetime.datetime.today().strftime('%Y-%m-%d')
+    von: <input type="date" id="fromDate" value="{{fromDate}}">
+    bis: <input type="date" id="toDate" value="{{toDate}}">
+    % end
+
+    <span style="margin-left: 2em">Suche: <input type="text" id="patternInput" placeholder="Filter" value=""></span>
+    <input type="submit" value="ok" style="margin-right:2em">
+
+    <a href="javascript:doPlot()" style="font-size:10pt">Umsätze aktualisieren</a>
+  </form>
+</fieldset>
+
 <div id="inout"></div>
 <p id="duplicates"></p>
 <p id="details"></p>

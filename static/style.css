@@ -45,6 +45,23 @@ tr:hover {
   background-color: #ddd;
 }
 
+td img {
+  vertical-align: middle;
+}
+
+input[type=text] {
+  border: 1px solid #555;
+}
+
+input[type=text]:focus {
+  border: 3px solid #555;
+  background-color: lightgreen;
+}
+
+input.wrongInput {
+  background-color: #FB7373;
+}
+
 .dontshow {
   visibility: hidden;
 }
