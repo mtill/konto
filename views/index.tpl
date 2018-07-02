@@ -20,6 +20,15 @@ var windowWidth = null;
 var plotData = null;
 detailsParams["byCategory"] = "{{byCategory}}";
 
+function selectAllAccounts(clickedAccount) {
+  var checkItems = !$(clickedAccount).prop("checked");
+  $(".accountCheckbox").each(function() {
+    if ($(this) != clickedAccount) {
+      $(this).prop("checked", checkItems);
+    }
+  });
+}
+
 function storeDates() {
   % if showDateSelector:
   detailsParams["fromDate"] = $("#fromDate").val();
@@ -166,7 +175,7 @@ $(document).ready(function() {
     <legend>Einstellungen</legend>
     <span style="margin-right: 2em">
       % for a in accounts:
-      <input type="checkbox" class="accountCheckbox" checked value="{{a}}">{{a}}
+      <input type="checkbox" class="accountCheckbox" ondblclick="selectAllAccounts($(this))" checked value="{{a}}">{{a}}
       % end
     </span>
 
