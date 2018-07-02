@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 
 % import datetime
-
 % showDateSelector = byCategory != 'year'
-
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -16,7 +14,6 @@
   <!-- <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> -->
 
 <script class="code" type="text/javascript">
-var windowWidth = null;
 var plotData = null;
 detailsParams["byCategory"] = "{{byCategory}}";
 
@@ -134,7 +131,7 @@ function doPlot() {
 }
 
 function refresh() {
-  doPlot();
+  inoutPlot();
 }
 
 function submitSettingsForm() {
@@ -145,13 +142,9 @@ function submitSettingsForm() {
 }
 
 $(document).ready(function() {
-  windowWidth=$(document).width();
-
-  // $(window).resize(function(){
-  //   if ($(document).width() != windowWidth) {
-  //     doPlot();
-  //   }
-  // });
+  $(window).resize(function() {
+    refresh();
+  });
 
   storeDates();
   doPlot();
@@ -193,7 +186,7 @@ $(document).ready(function() {
   </form>
 </fieldset>
 
-<div id="inout"></div>
+<div style="min-width:400pt" id="inout"></div>
 <p id="duplicates"></p>
 <p id="details"></p>
 
