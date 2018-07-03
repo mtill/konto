@@ -154,7 +154,7 @@ def getConsolidated(byCategory, traceNames, fromDate, toDate, categories, accoun
 
     compiledPattern = None
     if thepattern is not None:
-        compiledPattern = re.compile(thepattern)
+        compiledPattern = re.compile(thepattern, re.IGNORECASE)
 
     for f in filecontent:
         if len(f['category']) == 0:
