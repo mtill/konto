@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>konto - Übersicht</title>
   <link rel="stylesheet" type="text/css" href="/static/style.css">
-  <script class="include" type="text/javascript" src="/static/jquery-3.3.1.min.js"></script>
+  <script class="include" type="text/javascript" src="/static/jquery-latest.min.js"></script>
   <script class="include" type="text/javascript" src="/static/categorize.js"></script>
   <script src="/static/plotly-latest.min.js"></script>
   <!-- <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> -->

@@ -3,8 +3,8 @@ web based HBCI banking software
 
 ## how to install
 * pip3 install bottle (https://bottlepy.org/)
-* jquery (http://jquery.com/) -- put this library into the "static" folder
-* plotly for javascript (https://plot.ly/javascript/) -- put this library into the "static" folder
+* jquery (http://jquery.com/) -- put this library into the "static" folder (filename: jquery-latest.min.js)
+* plotly for javascript (https://plot.ly/javascript/) -- put this library into the "static" folder (filename: plotly-latest.min.js)
 
 ## how to use
 * python3 index.py dev
@@ -44,3 +44,4 @@ CREATE INDEX category ON categories(category ASC);
 sqlite3 my_database.sqlite ".backup backup_file.sqlite"
 OR: sqlite3 my_database .dump > my_database.back
 ~~~~
+
