@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
 % import datetime
-% showDateSelector = byCategory != 'year'
+% showDateSelector = True   #byCategory != 'year'
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -30,6 +30,15 @@ function storeDates() {
   % if showDateSelector:
   detailsParams["fromDate"] = $("#fromDate").val();
   detailsParams["toDate"] = $("#toDate").val();
+
+  % if byCategory == 'month':
+    toDateSplit = detailsParams["toDate"].split("-");
+    detailsParams["theX"] = toDateSplit[0] + "-" + toDateSplit[1];
+  % elif byCategory == 'year':
+    toDateSplit = detailsParams["toDate"].split("-");
+    detailsParams["theX"] = toDateSplit[0]
+  % end
+
   % end
 
   detailsParams["accounts"] = [];
@@ -69,7 +78,7 @@ function inoutPlot() {
                          traces,
                          {title: "{{title}}",
                            //hovermode: "closest",
-                           barmode: "stack",
+                           barmode: "relative",
                            xaxis: {
                              // tick0: firstDate,
                              dtick: "{{dtick}}"
@@ -149,11 +158,7 @@ $(document).ready(function() {
   storeDates();
   doPlot();
 
-  % if byCategory == 'month':
-  %   currentMonth = datetime.datetime.today().strftime('%Y-%m')
-  detailsParams["theX"] = "{{currentMonth}}";
   showDetails(detailsParams);
-  % end
 });
 </script>
 
@@ -173,20 +178,22 @@ $(document).ready(function() {
     </span>
 
     % if showDateSelector:
-    %   fromDate = (datetime.datetime.today() - datetime.timedelta(days=5*30)).replace(day=1).strftime('%Y-%m-%d')
+    %   if byCategory == 'year':
+    %     fromDate = '2000-01-01'
+    %   else:
+    %     fromDate = (datetime.datetime.today() - datetime.timedelta(days=5*30)).replace(day=1).strftime('%Y-%m-%d')
+    %   end
     %   toDate = datetime.datetime.today().strftime('%Y-%m-%d')
     von: <input type="date" id="fromDate" value="{{fromDate}}">
     bis: <input type="date" id="toDate" value="{{toDate}}">
     % end
 
     <span style="margin-left: 2em">Suche: <input type="text" id="patternInput" placeholder="Filter" value=""></span>
-    <input type="submit" value="ok" style="margin-right:2em">
-
-    <a href="javascript:doPlot()" style="font-size:10pt">Umsätze aktualisieren</a>
+    <input type="submit" value="Umsätze anzeigen / aktualisieren" style="margin-right:2em">
   </form>
 </fieldset>
 
-<div style="min-width:400pt" id="inout"></div>
+<div style="min-width:400pt;width:100%" id="inout"></div>
 <p id="duplicates"></p>
 <p id="details"></p>
 

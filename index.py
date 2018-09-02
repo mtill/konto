@@ -7,25 +7,26 @@ import json
 import sys
 import re
 
-import kontomodel as konto
+import kontomodel
 
 app = Bottle()
+def getKonto():
+    return kontomodel.KontoModel(sqlitefile='konto.sqlite')
 
 @app.route('/')
 @app.route('/byCategory/<byCategory>')
 def indexFile(byCategory='month'):
-    lists = konto.getLists()
-    accounts = konto.getAccounts()
-    return template('index.tpl', title='Ausgaben', site=byCategory, options=lists, byCategory=byCategory, tracesJSON=json.dumps(['traces', 'profit']), accounts=accounts)
+    accounts = getKonto().getAccounts()
+    return template('index.tpl', title='Ausgaben', site=byCategory, byCategory=byCategory, tracesJSON=json.dumps(['traces', 'profit']), accounts=accounts)
 
 @app.route('/addNewItem', method='POST')
 def addNewItem():
     thedate = request.json.get('newItemDate')
     theamount = request.json.get('newItemAmount')
     thename = request.json.get('newItemName')
-    thetitle = request.json.get('newItemTitle')
     thedescription = request.json.get('newItemDescription')
     thecategory = request.json.get('newItemCategory')
+    thenote = request.json.get('newItemNote')
 
     if thedate is None or thedate == '':
         raise Exception("invalid date")
@@ -33,45 +34,42 @@ def addNewItem():
         raise Exception("invalid amount")
     if thename is None or thename == '':
         raise Exception("invalid name")
-    if thetitle is None or thetitle == '':
-        raise Exception("invalid title")
-    thedateobj = datetime.datetime.strptime(thedate, '%Y-%m-%d')
+    if thedescription is None or thedescription == '':
+        raise Exception("invalid description")
 
     theamount = float(theamount)
-    thefilename = 'Bargeld-' + datetime.datetime.now().strftime('%Y-%m')
     theaccount = 'Bargeld'
 
-    newItem = konto.appendItem(thefilename=thefilename,
-               thedate=thedate,
+    newItem = getKonto().addItem(thedate=thedate,
                theaccount=theaccount,
                theamount=theamount,
                thecurrency='€',
                thename=thename,
-               thetitle=thetitle,
                thedescription=thedescription,
-               thecategory=thecategory)
+               thecategory=thecategory,
+               thenote=thenote)
 
     amountcurrency = str(newItem['amount']) + newItem['currency']
     thecategory = '' if newItem['category'] == 'nicht kategorisiert' else newItem['category']
     htmlentry = template('categoryItem.tpl',
-                         date=newItem['date'],
+                         date=thedate,
                          name=newItem['name'],
                          shortname=newItem['name'][0:20],
-                         title=newItem['title'],
+                         description=newItem['description'],
                          account=newItem['account'],
+                         shortdescription=newItem['description'][0:40],
                          theid=newItem['id'],
-                         shorttitle=newItem['title'][0:40],
                          amountcurrency=amountcurrency,
                          thecategory=thecategory,
-                         description=newItem['description'])
+                         thenote=newItem['note'])
 
     return json.dumps({'htmlentry': htmlentry, 'errormsg': ''})
 
 @app.route('/profit')
 def profit():
-    lists = konto.getLists()
-    accounts = konto.getAccounts()
-    return template('index.tpl', title='Gewinn', site='profit', options=lists, byCategory='month', tracesJSON=json.dumps(['profit', 'totalprofit']), accounts=accounts)
+    k = getKonto()
+    accounts = k.getAccounts()
+    return template('index.tpl', title='Gewinn', site='profit', byCategory='month', tracesJSON=json.dumps(['profit', 'totalprofit']), accounts=accounts)
 
 @app.route('/static/<thefilename:path>')
 def server_static(thefilename):
@@ -79,22 +77,24 @@ def server_static(thefilename):
 
 @app.route('/editCategories', method='GET')
 def editCategories(thefilename='categories'):
-    categoriesRaw = konto.readCategoriesFile()
-    uncategorized = konto.getUncategorizedItems()
+    k = getKonto()
+    categoriesRaw = k.getCategoriesAsString()
+    uncategorized = k.getUncategorizedItems()
     return template('editCategories.tpl', categoriesRaw=categoriesRaw, allcategoriesNames=uncategorized['allcategoriesNames'], uncategorized=uncategorized['items'])
 
 @app.route('/editCategories', method='POST')
 def submitCategories():
     try:
-        konto.writeCategories(categoriesString=request.forms.getunicode('categories'))
-    except re.error as e:
-        return 'invalid regex: ' + str(e)
+        getKonto().writeCategories(categoriesString=request.forms.getunicode('categories'))
+    except ValueError as e:
+        return str(e)
 
     return editCategories()
 
 @app.route('/getConsolidated', method="POST")
 def getConsolidated():
-    categories = konto.parseCategories()
+    k = getKonto()
+    categories = k.parseCategories()
     byCategory = request.json.get('byCategory')
     traces = request.json.get('traces')
 
@@ -112,7 +112,8 @@ def getConsolidated():
     patternInput = request.json.get('patternInput')
     thepattern = None if len(patternInput) == 0 else patternInput
 
-    consolidated = konto.getConsolidated(byCategory=byCategory, traceNames=traces, fromDate=fromDate, categories=categories, toDate=toDate, accounts=accounts, thepattern=thepattern)
+    legendonlyTraces = ["Umbuchung", "Gehalt"]
+    consolidated = k.getConsolidated(byCategory=byCategory, traceNames=traces, fromDate=fromDate, categories=categories, toDate=toDate, accounts=accounts, thepattern=thepattern, legendonlyTraces=legendonlyTraces)
 
     # return json.dumps(request.json.get('items'))
     return json.dumps({'traces': consolidated['traces'], 'foundDuplicates': consolidated['foundDuplicates']})
@@ -121,16 +122,22 @@ def getConsolidated():
 def updateItem():
     itemId = request.json.get('itemId')
     thename = request.json.get('thename')
-    thetitle = request.json.get('thetitle')
+    thedescription = request.json.get('thedescription')
     theamount = request.json.get('theamount')
     thecategory = request.json.get('thecategory')
-    thedescription = request.json.get('thedescription')
-    konto.updateItem(itemId=itemId, thename=thename, thetitle=thetitle, theamount=theamount, thecategory=thecategory, thedescription=thedescription)
+    thenote = request.json.get('thenote')
+    getKonto().updateItem(itemId=itemId, thename=thename, thedescription=thedescription, theamount=theamount, thecategory=thecategory, thenote=thenote)
+
+@app.route('/deleteItem', method="POST")
+def deleteItem():
+    itemId = request.json.get('itemId')
+    getKonto().deleteItem(itemId=itemId)
 
 @app.route('/getDetails', method="POST")
 def getDetails():
+    k = getKonto()
     theX = request.json.get('theX')
-    categories = konto.parseCategories()
+    categories = k.parseCategories()
     byCategory = request.json.get('byCategory')
 
     fromDateJSON = request.json.get('fromDate', None)
@@ -151,12 +158,6 @@ def getDetails():
     sortScatterBy = request.json.get('sortScatterBy')
     sortScatterByReverse = request.json.get('sortScatterByReverse')
 
-    theaction = request.json.get('action')
-    theactionParam = request.json.get('actionParam')
-
-    if theaction == 'deleteItem':
-        konto.deleteEntry(theactionParam)
-
     title = 'Umsätze'
     if categorySelection is not None:
         if len(categorySelection) == 1:
@@ -167,7 +168,8 @@ def getDetails():
     if theX is not None:
         title = title + template(' für {{theX}}', theX=theX)
 
-    consolidated = konto.getConsolidated(byCategory=byCategory, traceNames=['scatter'], fromDate=fromDate, categories=categories, toDate=toDate, accounts=accounts, thepattern=thepattern, categorySelection=categorySelection, sortScatterBy=sortScatterBy)
+    legendonlyTraces = ["Umbuchung", "Gehalt"]
+    consolidated = k.getConsolidated(byCategory=byCategory, traceNames=['scatter'], fromDate=fromDate, categories=categories, toDate=toDate, accounts=accounts, thepattern=thepattern, categorySelection=categorySelection, sortScatterBy=sortScatterBy, legendonlyTraces=legendonlyTraces)
     return template('categorize.tpl', title=title, theX=theX, allcategoriesNames=consolidated['allcategoriesNames'], scatter=consolidated['scatter'], reverseSort=sortScatterByReverse)
 
 if __name__ == "__main__":

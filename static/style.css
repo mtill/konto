@@ -1,3 +1,25 @@
+@media 
+only screen and (max-width: 760px),
+(min-device-width: 768px) and (max-device-width: 1024px)  {
+
+	table, thead, tbody, th, td, tr {
+		display: block; 
+	}
+
+	thead tr { 
+		display: none;
+	}
+	
+	tr { border: 1px solid #ccc; }
+
+	table.balance td:nth-of-type(1):before { content: "Datum: "; }
+	table.balance td:nth-of-type(2):before { content: "Name: "; }
+	table.balance td:nth-of-type(3):before { content: "Beschreibung: "; }
+	table.balance td:nth-of-type(4):before { content: "Betrag: "; }
+	table.balance td:nth-of-type(5):before { content: "Kategorie: "; }
+	table.balance td:nth-of-type(6):before { content: "Notiz: "; }
+}
+
 ul {
   list-style-type: none;
   margin: 0;

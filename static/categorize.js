@@ -10,21 +10,34 @@ function insertCategories() {
   }
 }
 
+function deleteItem(theid) {
+  $.ajax({
+         type: "POST",
+         url: "/deleteItem",
+         data: JSON.stringify({itemId: theid}),
+         success: function(data) {
+           $('#entry-' + theid).hide();
+         },
+         contentType: "application/json; charset=utf-8"
+       });
+
+}
+
 function updateItem(theid) {
   var thename = null;
-  if ($('#name-' + theid).length == 1) {
+  if ($('#name-' + theid).length != 0) {
     thename = $('#name-' + theid).val();
   }
   var thetitle = null;
-  if ($('#title-' + theid).length == 1) {
-    thename = $('#title-' + theid).val();
+  if ($('#title-' + theid).length != 0) {
+    thetitle = $('#title-' + theid).val();
   }
   var theamount = null;
-  if ($('#amount-' + theid).length == 1) {
-    thename = $('#amount-' + theid).val();
+  if ($('#amount-' + theid).length != 0) {
+    theamount = $('#amount-' + theid).val();
   }
   var theValue = $("#item-" + theid).val();
-  var thedescription = $("#description-" + theid).val();
+  var thenote = $("#note-" + theid).val();
 
   if (allcategoriesNames.indexOf(theValue) == -1) {
     allcategoriesNames.push(theValue);
@@ -39,7 +52,7 @@ function updateItem(theid) {
   $.ajax({
          type: "POST",
          url: "/updateItem",
-         data: JSON.stringify({itemId: theid, thecategory: theValue, thedescription: thedescription}),
+         data: JSON.stringify({itemId: theid, thecategory: theValue, thenote: thenote}),
          success: function(data) {
            if (theValue.trim() != "") {
              onItemCategorized(theid);
@@ -50,7 +63,7 @@ function updateItem(theid) {
 }
 
 function isConfirmed(event, theid) {
-  if (event.keyCode == 13) {
+  if (event !== false && event.keyCode == 13) {
     updateItem(theid);
     event.target.blur();
     return false;
@@ -61,7 +74,7 @@ function isConfirmed(event, theid) {
 }
 
 function isConfirmedNewItem(event) {
-  if (event.keyCode == 13) {
+  if (event !== false && event.keyCode == 13) {
     submitNewItem();
     event.target.blur();
     return false;
@@ -85,7 +98,7 @@ function markEmptyFields(fieldIds) {
 }
 
 function submitNewItem() {
-  var hasWrongInput = markEmptyFields(["newItemDate", "newItemName", "newItemTitle", "newItemAmount"]);
+  var hasWrongInput = markEmptyFields(["newItemDate", "newItemName", "newItemDescription", "newItemAmount"]);
   if (isNaN($("#newItemAmount").val())) {
     $("#newItemAmount").addClass("wrongInput");
     hasWrongInput = true;
@@ -97,19 +110,19 @@ function submitNewItem() {
            url: "/addNewItem",
            data: JSON.stringify({newItemDate: $("#newItemDate").val(),
                                  newItemName: $("#newItemName").val(),
-                                 newItemTitle: $("#newItemTitle").val(),
+                                 newItemDescription: $("#newItemDescription").val(),
                                  newItemAmount: $("#newItemAmount").val(),
                                  newItemCategory: $("#newItemCategory").val(),
-                                 newItemDescription: $("#newItemDescription").val()
+                                 newItemNote: $("#newItemNote").val()
                                }),
            success: function(data) {
              if (data.errormsg == "") {
                $("#addRevenueInput").before(data.htmlentry);
                $("#newItemName").val("");
-               $("#newItemTitle").val("");
+               $("#newItemDescription").val("");
                $("#newItemAmount").val("");
                $("#newItemCategory").val("");
-               $("#newItemDescription").val("");
+               $("#newItemNote").val("");
              } else {
                window.alert(data.errormsg);
              }
@@ -128,7 +141,7 @@ var detailsParams = {theX: null,
                      accounts: null,
                      patternInput: null,
                      categorySelection: null,
-                     sortScatterBy: 'date',
+                     sortScatterBy: 'timestamp',
                      sortScatterByReverse: true
                     };
 
@@ -142,7 +155,7 @@ function doSortScatterBy(sortBy) {
   showDetails(detailsParams);
 }
 
-function showDetails(params, action=null, actionParam=null) {
+function showDetails(params) {
   $("#details").html("<h2>Lade Details ...</h2>");
   $.ajax({
     type: "POST",
@@ -155,9 +168,7 @@ function showDetails(params, action=null, actionParam=null) {
                           patternInput: params["patternInput"],
                           categorySelection: params["categorySelection"],
                           sortScatterBy: params["sortScatterBy"],
-                          sortScatterByReverse: params["sortScatterByReverse"],
-                          action: action,
-                          actionParam: actionParam}),
+                          sortScatterByReverse: params["sortScatterByReverse"]}),
     success: function(thedata) {
       $("#details").html(thedata);
       insertCategories();
