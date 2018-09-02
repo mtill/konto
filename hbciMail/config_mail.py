@@ -24,7 +24,7 @@ sites = [
                       regex(contentregex='^.*$'),
                       HBCIParser()
                      ],
-          'postRun': [SaveTitlesParser(thepath=workingDirectory, filenamebase='banking')]
+          'postRun': [SaveTitlesParser(sqlitefile=os.path.join(workingDirectory, 'konto.sqlite'), account='banking')]
          }
 
         ]

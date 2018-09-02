@@ -44,8 +44,15 @@ class HBCIParser(Parser):
                 name = contentsplit[10]+contentsplit[11]
                 titlelist = contentsplit[12:22]
 
+                # addItem(self, thedate, theaccount, theamount, thecurrency, thename, thedescription, thecategory, thenote)
                 resulttitle = getSubject(amount + currency + ' ' + name + ' ' + (' '.join(titlelist)))
-                resultadditional['csv'] = date.replace(';', '_') + '; ' + amount.replace(';', '_') + '; ' + currency.replace(';', '_') + '; ' + name.strip().replace(';', '_') + '; ' + (' '.join(titlelist)).strip().replace(';', '_') + ';'
+                if not content.content.startswith("\"transactionId\";\"localBankCode\";"):
+                    resultadditional['csv'] = {'thedate': date.replace('/', '-'),
+                                               'theamount': float(amount),
+                                               'thecurrency': currency,
+                                               'thename': name.strip(),
+                                               'thedescription': (' '.join(titlelist)).strip()
+                                              }
 
                 resultcontent = 'Date: ' + date + '<br>\nName: ' + name + '<br>\nAmount: ' + amount + currency + '<br><br>Details:<br>\n' + ('\n<br>'.join(titlelist))
             break
@@ -72,19 +79,15 @@ class HBCIBalanceParser(Parser):
 
 
 class SaveTitlesParser(Parser):
-    def __init__(self, thepath, filenamebase):
-        self.thepath = thepath
-        self.filenamebase = filenamebase
+    def __init__(self, sqlitefile, account):
+        self.sqlitefile = sqlitefile
+        self.account = account
 
     def performAction(self, contentList):
-        thefilename = self.filenamebase + time.strftime("-%Y-%m")
-
-        kontomodel.doLock(thefilename=thefilename, thepath=self.thepath)
-        with open(os.path.join(self.thepath, thefilename + '.list'), 'a') as thefile:
-            for content in contentList:
-                if 'csv' in content.additional:
-                    theline = content.additional['csv']
-                    thefile.write(theline + "\n")
-
-        kontomodel.doUnlock(thefilename=thefilename, thepath=self.thepath)
+        print(self.sqlitefile)
+        k = kontomodel.KontoModel(sqlitefile=self.sqlitefile)
+        for content in contentList:
+            if 'csv' in content.additional:
+                i = content.additional['csv']
+                k.addItem(thedate=i['thedate'], theaccount=self.account, theamount=i['theamount'], thecurrency=i['thecurrency'], thename=i['thename'], thedescription=i['thedescription'], thecategory=None, thenote=None)
 
