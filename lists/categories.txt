@@ -1,5 +1,0 @@
-# category; field; pattern
-
-Miete;title;.*Miete.*
-Gehalt;title;.*GEHALT.*
-Einkäufe;name;.*Drogeriemarkt.*
