@@ -13,35 +13,6 @@ web based HBCI banking software
 ## how to poll your bank account for updates
 have a look at the hbciMail/config_mail.py example and the MailWebsiteChanges tool (https://github.com/mtill/MailWebsiteChanges)
 
-# database model
-~~~~
-CREATE TABLE transactions(
-  account TEXT NOT NULL,
-  timestamp INTEGER NOT NULL,
-  amount REAL NOT NULL,
-  currency TEXT NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT NOT NULL,
-  category TEXT NULL,
-  note TEXT NULL,
-  id INTEGER PRIMARY KEY AUTOINCREMENT);
-
-CREATE INDEX account ON transactions(account);
-CREATE INDEX timestamp ON transactions(timestamp ASC);
-
-
-CREATE TABLE categories(
-  pattern TEXT NOT NULL,
-  field TEXT NOT NULL,
-  category TEXT NOT NULL
-);
-
-CREATE INDEX category ON categories(category ASC);
-~~~~
-
-# database backup
-~~~~
+## how to backup the transaction database
 sqlite3 my_database.sqlite ".backup backup_file.sqlite"
 OR: sqlite3 my_database .dump > my_database.back
-~~~~
-

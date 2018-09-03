@@ -12,9 +12,16 @@ import sqlite3
 
 class KontoModel:
     def __init__(self, sqlitefile):
+        isExistingDB = os.path.exists(sqlitefile)
+
         self.conn = sqlite3.connect(sqlitefile)
         self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
+
+        if not isExistingDB:
+            with open('dbmodel.sql', 'r') as thefile:
+                self.conn.executescript(thefile.read())
+            print("initiated new database")
 
     def close(self):
         self.conn.close()
