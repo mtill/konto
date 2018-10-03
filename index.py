@@ -49,7 +49,7 @@ def addNewItem():
                thecategory=thecategory,
                thenote=thenote)
 
-    amountcurrency = str(newItem['amount']) + newItem['currency']
+    amountcurrency = '{:.2f}'.format(newItem['amount']) + newItem['currency']
     thecategory = '' if newItem['category'] == 'nicht kategorisiert' else newItem['category']
     htmlentry = template('categoryItem.tpl',
                          date=thedate,
@@ -179,3 +179,4 @@ if __name__ == "__main__":
     else:
         print('using cherrypy engine')
         run(app, server='cherrypy', host='0.0.0.0', port=8080)
+

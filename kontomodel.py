@@ -91,15 +91,16 @@ class KontoModel:
         hasParams = False
         if fromDate is not None:
             timestampsql = timestampsql + 'timestamp>=? AND '
-            fromDateTimestamp = fromDate.timestamp()
+            fromDateTimestamp = calendar.timegm(fromDate.utctimetuple())
             sqlparam.append(fromDateTimestamp)
             hasParams = True
         if toDate is not None:
-            timestampsql = timestampsql + 'timestamp<=? AND '
-            toDateTimestamp = toDate.timestamp()
+            timestampsql = timestampsql + 'timestamp<? AND '
+            toDateTimestamp = calendar.timegm((toDate + datetime.timedelta(days=1)).utctimetuple())
             sqlparam.append(toDateTimestamp)
             hasParams = True
 
+        print()
         accountsql = ''
         if accounts is not None:
             sqlparam.extend(accounts)
@@ -118,10 +119,8 @@ class KontoModel:
 
             thecategory = '' if c['category'] is None else c['category']
             thenote = '' if c['note'] is None else c['note']
-            dt = datetime.datetime.fromtimestamp(c['timestamp'])
-            ctimestamp = calendar.timegm(dt.utctimetuple())
             result.append({'id': c['id'],
-                    'timestamp': ctimestamp,
+                    'timestamp': c['timestamp'],
                     'account': c['account'],
                     'amount': float(c['amount']),
                     'currency': c['currency'],
@@ -135,7 +134,6 @@ class KontoModel:
     # returns newly added item
     def addItem(self, thedate, theaccount, theamount, thecurrency, thename, thedescription, thecategory, thenote):
         timestamp = calendar.timegm(datetime.datetime.strptime(thedate, '%Y-%m-%d').utctimetuple())
-
         self.cursor.execute('INSERT INTO transactions (account,timestamp,amount,currency,name,description,category,note,id) VALUES (?,?,?,?,?,?,?,?,NULL)', (theaccount, timestamp, theamount, thecurrency, thename, thedescription, thecategory, thenote))
         theid = self.cursor.execute('SELECT last_insert_rowid()').fetchone()[0]
         self.conn.commit()
