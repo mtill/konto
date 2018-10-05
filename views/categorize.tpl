@@ -1,4 +1,4 @@
-<h2>{{title}}</h2>
+<h2>{{title}} <img src="/static/download.png" class="clickable" onclick="doDownload(detailsParams)" alt="Umsätze exportieren"></h2>
 
 % import json
 % import datetime
@@ -45,7 +45,7 @@
     % shortdescription = scatter['description'][i][0:40]
     % account = scatter['account'][i]
     % theid = scatter['id'][i]
-    % amountcurrency = str(scatter['amount'][i]) + scatter['currency'][i]
+    % amountcurrency = '{:.2f}'.format(scatter['amount'][i]) + scatter['currency'][i]
     % thecategory = '' if scatter['category'][i] == 'nicht kategorisiert' else scatter['category'][i]
     % thenote = scatter['note'][i]
     %

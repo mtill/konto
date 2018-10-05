@@ -175,4 +175,43 @@ function showDetails(params) {
     },
     contentType: "application/json; charset=utf-8"
   });
+
+}
+
+function doDownload(params) {
+  $.ajax({
+    type: "POST",
+    url: "/getDetails",
+    data: JSON.stringify({theX: params["theX"],
+                          byCategory: params["byCategory"],
+                          fromDate: params["fromDate"],
+                          toDate: params["toDate"],
+                          accounts: params["accounts"],
+                          patternInput: params["patternInput"],
+                          categorySelection: params["categorySelection"],
+                          sortScatterBy: params["sortScatterBy"],
+                          sortScatterByReverse: params["sortScatterByReverse"],
+                          csvexport: true}),
+    success: function(thedata) {
+        //var w = window.open("about:blank", "csvexport");
+        //w.document.open();
+        //w.document.write(thedata);
+        //w.document.close();
+
+        var newBlob = new Blob([thedata], {type: "text/csv; charset=utf-8"});
+        var blobdata = window.URL.createObjectURL(newBlob);
+        var thelink = document.createElement('a');
+        thelink.href = blobdata;
+        thelink.style.display = "none";
+        thelink.download = "konto_" + params["fromDate"] + "_" + params["toDate"] + ".csv";
+        $("body").append(thelink);
+        thelink.click();
+        setTimeout(function() {
+            window.URL.revokeObjectURL(blobdata);
+	    $(thelink).remove();
+	}, 5000);
+
+    },
+    contentType: "application/json; charset=utf-8"
+  });
 }

@@ -6,6 +6,8 @@ import datetime
 import json
 import sys
 import re
+import io
+import csv
 
 import kontomodel
 
@@ -158,6 +160,8 @@ def getDetails():
     sortScatterBy = request.json.get('sortScatterBy')
     sortScatterByReverse = request.json.get('sortScatterByReverse')
 
+    csvexport = request.json.get('csvexport', False)
+
     title = 'Umsätze'
     if categorySelection is not None:
         if len(categorySelection) == 1:
@@ -170,7 +174,30 @@ def getDetails():
 
     legendonlyTraces = ["Umbuchung", "Gehalt"]
     consolidated = k.getConsolidated(byCategory=byCategory, traceNames=['scatter'], fromDate=fromDate, categories=categories, toDate=toDate, accounts=accounts, thepattern=thepattern, categorySelection=categorySelection, sortScatterBy=sortScatterBy, legendonlyTraces=legendonlyTraces)
-    return template('categorize.tpl', title=title, theX=theX, allcategoriesNames=consolidated['allcategoriesNames'], scatter=consolidated['scatter'], reverseSort=sortScatterByReverse)
+
+    if csvexport:
+        cwriterresult = io.StringIO()
+        cwriter = csv.DictWriter(cwriterresult, fieldnames=['id', 'date', 'x', 'account', 'amount', 'currency', 'name', 'description', 'category', 'note'], delimiter=',')
+        cwriter.writeheader()
+        thescatter = consolidated['scatter']
+        for i in range(0, len(thescatter['timestamp'])):
+            mydate = datetime.datetime.fromtimestamp(thescatter['timestamp'][i]).strftime('%Y-%m-%d')
+            cwriter.writerow({'date': mydate,
+                              'account': thescatter['account'][i],
+                              'id': thescatter['id'][i],
+                              'amount': thescatter['amount'][i],
+                              'currency': thescatter['currency'][i],
+                              'name': thescatter['name'][i],
+                              'description': thescatter['description'][i],
+                              'category': thescatter['category'][i],
+                              'note': thescatter['note'][i],
+                              'x': thescatter['theX'][i]})
+        cwriterresultstr = cwriterresult.getvalue()
+        cwriterresult.close()
+        return cwriterresultstr
+    else:
+        return template('categorize.tpl', title=title, theX=theX, allcategoriesNames=consolidated['allcategoriesNames'], scatter=consolidated['scatter'], reverseSort=sortScatterByReverse)
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == 'dev':

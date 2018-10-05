@@ -100,7 +100,6 @@ class KontoModel:
             sqlparam.append(toDateTimestamp)
             hasParams = True
 
-        print()
         accountsql = ''
         if accounts is not None:
             sqlparam.extend(accounts)

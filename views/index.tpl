@@ -147,6 +147,7 @@ function submitSettingsForm() {
   storeDates();
   doPlot();
   showDetails(detailsParams);
+
   return false;
 }
 
@@ -189,7 +190,8 @@ $(document).ready(function() {
     % end
 
     <span style="margin-left: 2em">Suche: <input type="text" id="patternInput" placeholder="Filter" value=""></span>
-    <input type="submit" value="Umsätze anzeigen / aktualisieren" style="margin-right:2em">
+
+    <input type="submit" value="Umsätze anzeigen / aktualisieren" style="margin-left:2em">
   </form>
 </fieldset>
 
