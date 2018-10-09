@@ -27,18 +27,42 @@ function selectAllAccounts(clickedAccount) {
 }
 
 function storeDates() {
+  var wrongInput = false;
+
+  var minAmount = $("#minAmount").val();
+  if (minAmount.trim() == "") {
+    minAmount = null;
+  }
+  var maxAmount = $("#maxAmount").val();
+  if (maxAmount.trim() == "") {
+    maxAmount = null;
+  }
+
+  if (minAmount != null && isNaN(minAmount)) {
+    $("#minAmount").addClass("wrongInput");
+    wrongInput = true;
+  } else {
+    minAmount = parseFloat(minAmount);
+    $("#minAmount").removeClass("wrongInput");
+  }
+
+  if (maxAmount != null && isNaN(maxAmount)) {
+    $("#maxAmount").addClass("wrongInput");
+    wrongInput = true;
+  } else {
+    maxAmount = parseFloat(maxAmount);
+    $("#maxAmount").removeClass("wrongInput");
+  }
+
+  if (wrongInput) {
+    return false;
+  }
+
+  detailsParams["theX"] = null;
+
   % if showDateSelector:
   detailsParams["fromDate"] = $("#fromDate").val();
   detailsParams["toDate"] = $("#toDate").val();
-
-  % if byCategory == 'month':
-    toDateSplit = detailsParams["toDate"].split("-");
-    detailsParams["theX"] = toDateSplit[0] + "-" + toDateSplit[1];
-  % elif byCategory == 'year':
-    toDateSplit = detailsParams["toDate"].split("-");
-    detailsParams["theX"] = toDateSplit[0]
-  % end
-
   % end
 
   detailsParams["accounts"] = [];
@@ -48,6 +72,11 @@ function storeDates() {
     }
   });
   detailsParams["patternInput"] = $("#patternInput").val();
+
+  detailsParams["minAmount"] = minAmount;
+  detailsParams["maxAmount"] = maxAmount;
+
+  return true;
 }
 
 function onItemCategorized(theid) {
@@ -117,6 +146,8 @@ function doPlot() {
   //});
 
   $('#duplicates').html("");
+  $('#details').html("<h2 class=\"clickable\" onclick=\"showDetails(detailsParams)\">Umsätze <img src=\"/static/view-more.png\" alt=\"Details laden\">");
+  //showDetails(detailsParams);
   $.ajax({
          type: "POST",
          url: "/getConsolidated",
@@ -125,7 +156,9 @@ function doPlot() {
                                fromDate: detailsParams["fromDate"],
                                toDate: detailsParams["toDate"],
                                accounts: detailsParams["accounts"],
-                               patternInput: detailsParams["patternInput"]
+                               patternInput: detailsParams["patternInput"],
+                               minAmount: detailsParams["minAmount"],
+                               maxAmount: detailsParams["maxAmount"]
                              }),
          success: function(thedata) {
            plotData = thedata;
@@ -144,9 +177,10 @@ function refresh() {
 }
 
 function submitSettingsForm() {
-  storeDates();
-  doPlot();
-  showDetails(detailsParams);
+  var validInput = storeDates();
+  if (validInput) {
+    doPlot();
+  }
 
   return false;
 }
@@ -156,10 +190,11 @@ $(document).ready(function() {
     refresh();
   });
 
-  storeDates();
-  doPlot();
+  var validInput = storeDates();
+  if (validInput) {
+    doPlot();
+  }
 
-  showDetails(detailsParams);
 });
 </script>
 
@@ -185,11 +220,12 @@ $(document).ready(function() {
     %     fromDate = (datetime.datetime.today() - datetime.timedelta(days=5*30)).replace(day=1).strftime('%Y-%m-%d')
     %   end
     %   toDate = datetime.datetime.today().strftime('%Y-%m-%d')
-    von: <input type="date" id="fromDate" value="{{fromDate}}">
-    bis: <input type="date" id="toDate" value="{{toDate}}">
+    <span style="margin-left: 2em">Datum: <input type="date" id="fromDate" value="{{fromDate}}"> - <input type="date" id="toDate" value="{{toDate}}"></span>
     % end
 
-    <span style="margin-left: 2em">Suche: <input type="text" id="patternInput" placeholder="Filter" value=""></span>
+    <span style="margin-left: 2em">Betrag: <input type="text" id="minAmount" size="5" placeholder="min" value=""> - <input type="text" id="maxAmount" size="5" placeholder="max" value=""></span>
+
+    <span style="margin-left: 2em">Suche: <input type="text" size="10" id="patternInput" placeholder="Filter" value=""></span>
 
     <input type="submit" value="Umsätze anzeigen / aktualisieren" style="margin-left:2em">
   </form>

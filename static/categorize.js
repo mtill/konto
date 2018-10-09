@@ -142,7 +142,9 @@ var detailsParams = {theX: null,
                      patternInput: null,
                      categorySelection: null,
                      sortScatterBy: 'timestamp',
-                     sortScatterByReverse: true
+                     sortScatterByReverse: true,
+                     minAmount: null,
+                     maxAmount: null
                     };
 
 function doSortScatterBy(sortBy) {
@@ -168,7 +170,10 @@ function showDetails(params) {
                           patternInput: params["patternInput"],
                           categorySelection: params["categorySelection"],
                           sortScatterBy: params["sortScatterBy"],
-                          sortScatterByReverse: params["sortScatterByReverse"]}),
+                          sortScatterByReverse: params["sortScatterByReverse"],
+                          minAmount: params["minAmount"],
+                          maxAmount: params["maxAmount"]
+    }),
     success: function(thedata) {
       $("#details").html(thedata);
       insertCategories();

@@ -83,33 +83,36 @@ class KontoModel:
             result = result + c['category'] + ';' + c['field'] + ';' + c['pattern'] + '\n'
         return result
 
-    def getTransactions(self, accounts, fromDate, toDate):
+    def getTransactions(self, accounts, fromDate, toDate, minAmount, maxAmount):
         result = []
 
-        timestampsql = ''
+        sqlparts = []
         sqlparam = []
-        hasParams = False
+
         if fromDate is not None:
-            timestampsql = timestampsql + 'timestamp>=? AND '
+            sqlparts.append('timestamp>=?')
             fromDateTimestamp = calendar.timegm(fromDate.utctimetuple())
             sqlparam.append(fromDateTimestamp)
-            hasParams = True
         if toDate is not None:
-            timestampsql = timestampsql + 'timestamp<? AND '
+            sqlparts.append('timestamp<?')
             toDateTimestamp = calendar.timegm((toDate + datetime.timedelta(days=1)).utctimetuple())
             sqlparam.append(toDateTimestamp)
-            hasParams = True
 
-        accountsql = ''
+        if minAmount is not None:
+            sqlparts.append('amount>=?')
+            sqlparam.append(minAmount)
+        if maxAmount is not None:
+            sqlparts.append('amount<=?')
+            sqlparam.append(maxAmount)
+
         if accounts is not None:
             sqlparam.extend(accounts)
             q = ','.join('?' * len(accounts))
-            accountsql = 'account IN (' + q + ')'
-            hasParams = True
+            sqlparts.append('account IN (' + q + ')')
 
         sqlquery = None
-        if hasParams:
-            sqlquery = self.cursor.execute('SELECT * FROM transactions WHERE ' + timestampsql + accountsql, sqlparam)
+        if len(sqlparts) != 0:
+            sqlquery = self.cursor.execute('SELECT * FROM transactions WHERE ' + (' AND '.join(sqlparts)), sqlparam)
         else:
             sqlquery = self.cursor.execute('SELECT * FROM transactions')
         for c in sqlquery:
@@ -154,8 +157,8 @@ class KontoModel:
         result = q.fetchall()
         return [i[0] for i in result]
 
-    def getConsolidated(self, byCategory, traceNames, fromDate, toDate, categories, accounts, thepattern=None, categorySelection=None, sortScatterBy='timestamp', legendonlyTraces=None):
-        filecontent = self.getTransactions(accounts=accounts, fromDate=fromDate, toDate=toDate)
+    def getConsolidated(self, byCategory, traceNames, fromDate, toDate, categories, accounts, thepattern=None, categorySelection=None, sortScatterBy='timestamp', legendonlyTraces=None, minAmount=None, maxAmount=None):
+        filecontent = self.getTransactions(accounts=accounts, fromDate=fromDate, toDate=toDate, minAmount=minAmount, maxAmount=maxAmount)
         duplicatesMap = {}
         foundDuplicates = []
 
@@ -323,9 +326,9 @@ class KontoModel:
             'id': scatter['id'][i]
         }
 
-    def getUncategorizedItems(self, fromDate=None, toDate=None, accounts=None, legendonlyTraces=None):
+    def getUncategorizedItems(self, fromDate=None, toDate=None, accounts=None, legendonlyTraces=None, minAmount=None, maxAmount=None):
         categories = self.parseCategories()
-        consolidated = self.getConsolidated(byCategory='month', traceNames=['scatter'], fromDate=fromDate, toDate=None, categories=categories, accounts=accounts, legendonlyTraces=legendonlyTraces)
+        consolidated = self.getConsolidated(byCategory='month', traceNames=['scatter'], fromDate=fromDate, toDate=None, categories=categories, accounts=accounts, legendonlyTraces=legendonlyTraces, minAmount=minAmount, maxAmount=maxAmount)
         scatter = consolidated['scatter']
 
         result = {}
@@ -358,3 +361,4 @@ if __name__ == "__main__":
     for i in u:
         print(i['id'])
     m.close()
+

@@ -114,8 +114,11 @@ def getConsolidated():
     patternInput = request.json.get('patternInput')
     thepattern = None if len(patternInput) == 0 else patternInput
 
+    minAmount = request.json.get('minAmount', None)
+    maxAmount = request.json.get('maxAmount', None)
+
     legendonlyTraces = ["Umbuchung", "Gehalt"]
-    consolidated = k.getConsolidated(byCategory=byCategory, traceNames=traces, fromDate=fromDate, categories=categories, toDate=toDate, accounts=accounts, thepattern=thepattern, legendonlyTraces=legendonlyTraces)
+    consolidated = k.getConsolidated(byCategory=byCategory, traceNames=traces, fromDate=fromDate, categories=categories, toDate=toDate, accounts=accounts, thepattern=thepattern, legendonlyTraces=legendonlyTraces, minAmount=minAmount, maxAmount=maxAmount)
 
     # return json.dumps(request.json.get('items'))
     return json.dumps({'traces': consolidated['traces'], 'foundDuplicates': consolidated['foundDuplicates']})
@@ -171,9 +174,11 @@ def getDetails():
 
     if theX is not None:
         title = title + template(' für {{theX}}', theX=theX)
+    minAmount = request.json.get('minAmount', None)
+    maxAmount = request.json.get('maxAmount', None)
 
     legendonlyTraces = ["Umbuchung", "Gehalt"]
-    consolidated = k.getConsolidated(byCategory=byCategory, traceNames=['scatter'], fromDate=fromDate, categories=categories, toDate=toDate, accounts=accounts, thepattern=thepattern, categorySelection=categorySelection, sortScatterBy=sortScatterBy, legendonlyTraces=legendonlyTraces)
+    consolidated = k.getConsolidated(byCategory=byCategory, traceNames=['scatter'], fromDate=fromDate, categories=categories, toDate=toDate, accounts=accounts, thepattern=thepattern, categorySelection=categorySelection, sortScatterBy=sortScatterBy, legendonlyTraces=legendonlyTraces, minAmount=minAmount, maxAmount=maxAmount)
 
     if csvexport:
         cwriterresult = io.StringIO()
