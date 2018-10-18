@@ -1,27 +1,38 @@
 #!/usr/bin/env python3
 # coding=utf-8
 
-from bottle import Bottle, static_file, request, template, run
+from bottle import Bottle, static_file, request, template, run, auth_basic
 import datetime
 import json
 import sys
 import re
+import os
 import io
 import csv
+import json
+import hashlib
 
 import kontomodel
 
+configdata = None
 app = Bottle()
+
 def getKonto():
     return kontomodel.KontoModel(sqlitefile='konto.sqlite')
 
+def check_pass(username, password):
+    global configdata
+    return configdata is None or (('username' not in configdata or configdata['username'] is None or configdata['username'] == username) and ('passwordsha224' not in configdata or configdata['passwordsha224'] is None or configdata['passwordsha224'] == hashlib.sha224(password.encode()).hexdigest()))
+
 @app.route('/')
 @app.route('/byCategory/<byCategory>')
+@auth_basic(check_pass)
 def indexFile(byCategory='month'):
     accounts = getKonto().getAccounts()
     return template('index.tpl', title='Ausgaben', site=byCategory, byCategory=byCategory, tracesJSON=json.dumps(['traces', 'profit']), accounts=accounts)
 
 @app.route('/addNewItem', method='POST')
+@auth_basic(check_pass)
 def addNewItem():
     thedate = request.json.get('newItemDate')
     theamount = request.json.get('newItemAmount')
@@ -68,16 +79,19 @@ def addNewItem():
     return json.dumps({'htmlentry': htmlentry, 'errormsg': ''})
 
 @app.route('/profit')
+@auth_basic(check_pass)
 def profit():
     k = getKonto()
     accounts = k.getAccounts()
     return template('index.tpl', title='Gewinn', site='profit', byCategory='month', tracesJSON=json.dumps(['profit', 'totalprofit']), accounts=accounts)
 
 @app.route('/static/<thefilename:path>')
+@auth_basic(check_pass)
 def server_static(thefilename):
     return static_file(thefilename, root='static')
 
 @app.route('/editCategories', method='GET')
+@auth_basic(check_pass)
 def editCategories(thefilename='categories'):
     k = getKonto()
     categoriesRaw = k.getCategoriesAsString()
@@ -85,6 +99,7 @@ def editCategories(thefilename='categories'):
     return template('editCategories.tpl', categoriesRaw=categoriesRaw, allcategoriesNames=uncategorized['allcategoriesNames'], uncategorized=uncategorized['items'])
 
 @app.route('/editCategories', method='POST')
+@auth_basic(check_pass)
 def submitCategories():
     try:
         getKonto().writeCategories(categoriesString=request.forms.getunicode('categories'))
@@ -94,6 +109,7 @@ def submitCategories():
     return editCategories()
 
 @app.route('/getConsolidated', method="POST")
+@auth_basic(check_pass)
 def getConsolidated():
     k = getKonto()
     categories = k.parseCategories()
@@ -124,6 +140,7 @@ def getConsolidated():
     return json.dumps({'traces': consolidated['traces'], 'foundDuplicates': consolidated['foundDuplicates']})
 
 @app.route('/updateItem', method="POST")
+@auth_basic(check_pass)
 def updateItem():
     itemId = request.json.get('itemId')
     thename = request.json.get('thename')
@@ -134,11 +151,13 @@ def updateItem():
     getKonto().updateItem(itemId=itemId, thename=thename, thedescription=thedescription, theamount=theamount, thecategory=thecategory, thenote=thenote)
 
 @app.route('/deleteItem', method="POST")
+@auth_basic(check_pass)
 def deleteItem():
     itemId = request.json.get('itemId')
     getKonto().deleteItem(itemId=itemId)
 
 @app.route('/getDetails', method="POST")
+@auth_basic(check_pass)
 def getDetails():
     k = getKonto()
     theX = request.json.get('theX')
@@ -205,6 +224,10 @@ def getDetails():
 
 
 if __name__ == "__main__":
+    if os.path.isfile('/etc/konto.config'):
+        with open('/etc/konto.config', 'r') as thefile:
+            configdata = json.load(thefile)
+
     if len(sys.argv) > 1 and sys.argv[1] == 'dev':
         print('using dev engine')
         run(app, host='0.0.0.0', port=8080)
