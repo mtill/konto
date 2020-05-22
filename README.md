@@ -3,6 +3,7 @@ web based HBCI banking software
 
 ## how to install
 * pip3 install bottle (https://bottlepy.org/)
+* cp mwc-full.conf /usr/local/share/aqbanking/imexporters/csv/profiles
 
 ## how to use
 * python3 index.py dev
