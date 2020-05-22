@@ -32,59 +32,38 @@ class KontoModel:
                 return category['category']
         return unknownCategory
 
-    def writeCategories(self, categoriesString):
-        # validating the input string
-        parsedCategories = self._parseCategories(categoriesString.split('\n'))
-
-        self.cursor.execute('DELETE FROM categories')
-        self.cursor.execute('VACUUM')
-        self.cursor.executemany('INSERT INTO categories (category,field,pattern) VALUES (:category,:field,:pattern)', parsedCategories)
-        self.conn.commit()
+    def getCategoriesNames(self):
+        result = []
+        for i in self.cursor.execute('SELECT DISTINCT category FROM categories ORDER BY category ASC'):
+            result.append(i['category'])
+        return result
 
     def parseCategories(self):
         result = []
-        for i in self.cursor.execute('SELECT * FROM categories'):
-            result.append({'category': i['category'],
+        for i in self.cursor.execute('SELECT rowid,* FROM categories'):
+            result.append({'id': i["rowid"],
+                           'category': i['category'],
                            'field': i['field'],
                            'pattern': i['pattern'],
-                           'compiledPattern': re.compile(i['pattern'])
+                           'compiledPattern': re.compile(i['pattern']),
+                           'expectedValue': None if i['expectedValue'] is None or i['expectedValue'] == 'None' or len(str(i['expectedValue']).strip()) == 0 else float(i['expectedValue']),
+                           "priority": i['priority']
                           })
         return result
 
-    def _parseCategories(self, f):
+    def getTransactions(self, accounts, fromDate, toDate, minAmount, maxAmount, categorySelection=None, thepattern=None):
         result = []
-        for line in f:
-            line = line.strip()
-            if len(line) == 0 or line[0] == '#':
-                continue
 
-            categoryEnd = line.find(';')
-            fieldEnd = line.find(';', categoryEnd+1)
-            thepattern = line[fieldEnd+1:]
-            if categoryEnd == -1 or fieldEnd == -1:
-                raise ValueError('cannot parse categories string')
-            field = line[categoryEnd+1:fieldEnd]
-            if field not in ['account', 'name', 'description', 'amount', 'currency', 'note']:
-                raise ValueError('cannot parse categories string: unknown field ' + field)
+        compiledPattern = None
+        if thepattern is not None:
+            compiledPattern = re.compile(thepattern, re.IGNORECASE)
+        duplicatesMap = {}
 
-            result.append({
-               'category': line[0:categoryEnd],
-               'field': field,
-               'pattern': thepattern
-               # 'compiledPattern': re.compile(thepattern),
-               })
-
-        return result
-
-    def getCategoriesAsString(self):
-        result = ''
+        allcategoriesNames = []
         categories = self.parseCategories()
-        for c in categories:
-            result = result + c['category'] + ';' + c['field'] + ';' + c['pattern'] + '\n'
-        return result
-
-    def getTransactions(self, accounts, fromDate, toDate, minAmount, maxAmount):
-        result = []
+        for cc in categories:
+            if cc['category'] not in allcategoriesNames:
+                allcategoriesNames.append(cc['category'])
 
         sqlparts = []
         sqlparam = []
@@ -94,8 +73,8 @@ class KontoModel:
             fromDateTimestamp = calendar.timegm(fromDate.utctimetuple())
             sqlparam.append(fromDateTimestamp)
         if toDate is not None:
-            sqlparts.append('timestamp<?')
-            toDateTimestamp = calendar.timegm((toDate + datetime.timedelta(days=1)).utctimetuple())
+            sqlparts.append('timestamp<=?')
+            toDateTimestamp = calendar.timegm(toDate.utctimetuple())
             sqlparam.append(toDateTimestamp)
 
         if minAmount is not None:
@@ -112,110 +91,120 @@ class KontoModel:
 
         sqlquery = None
         if len(sqlparts) != 0:
-            sqlquery = self.cursor.execute('SELECT * FROM transactions WHERE ' + (' AND '.join(sqlparts)), sqlparam)
+            sqlquery = self.cursor.execute('SELECT rowid,* FROM transactions WHERE ' + (' AND '.join(sqlparts)), sqlparam)
         else:
-            sqlquery = self.cursor.execute('SELECT * FROM transactions')
+            sqlquery = self.cursor.execute('SELECT rowid,* FROM transactions')
+
         for c in sqlquery:
-            if c['currency'] != '€':
+            if c['currency'] != '€' and c["currency"] != "EUR" and c["currency"] != "":
                 raise Exception('unknown currency ' + c['currency'])
 
-            thecategory = '' if c['category'] is None else c['category']
+            thecategory = c['category']
+            if thecategory is None or len(thecategory) == 0:
+                thecategory = self.findCategory(theitem=c, categories=categories)
+            else:
+                if thecategory not in allcategoriesNames:
+                    allcategoriesNames.append(thecategory)
+
+            notestr = ""
+            if c['note'] is not None:
+                notestr = c['note']
+            dupLine = str(c['timestamp']) + ' ' + str(c['amount']) + ' ' + c['name'] + ' ' + notestr
+            if dupLine not in duplicatesMap:
+                duplicatesMap[dupLine] = []
+            duplicatesMap[dupLine].append({"date":          datetime.datetime.fromtimestamp(c["timestamp"]).strftime("%Y-%m-%d"),
+                                           "id":            c["rowid"],
+                                           "name":          c["name"],
+                                           "description":   c["description"],
+                                           "amount":        "{:.2f}".format(c["amount"]),
+                                           "amountint":     c["amount"],
+                                           "currency":      c["currency"],
+                                           "note":          c["note"]})
+
+            if thecategory is None:
+                thecategory = ''
             thenote = '' if c['note'] is None else c['note']
-            result.append({'id': c['id'],
-                    'timestamp': c['timestamp'],
-                    'account': c['account'],
-                    'amount': float(c['amount']),
-                    'currency': c['currency'],
-                    'name': c['name'],
-                    'description': c['description'],
-                    'category': thecategory,
-                    'note': thenote})
+            e = {'id': c['rowid'],
+                 'timestamp': c['timestamp'],
+                 'account': c['account'],
+                 'amount': float(c['amount']),
+                 'currency': c['currency'],
+                 'name': c['name'],
+                 'description': c['description'],
+                 'category': thecategory,
+                 'note': thenote}
+            if (categorySelection is None or thecategory in categorySelection)\
+                and (compiledPattern is None or compiledPattern.search('|'.join(map(str, e.values())))):
+                result.append(e)
 
-        return result
+        foundDuplicates = []
+        for k, v in duplicatesMap.items():
+            if len(v) > 1:
+                foundDuplicates.extend(v)
+        return {"transactions": result, "foundDuplicates": foundDuplicates, "allcategoriesNames": sorted(allcategoriesNames, key=lambda x: x.lower())}
 
-    # returns newly added item
-    def addItem(self, thedate, theaccount, theamount, thecurrency, thename, thedescription, thecategory, thenote):
-        timestamp = calendar.timegm(datetime.datetime.strptime(thedate, '%Y-%m-%d').utctimetuple())
-        self.cursor.execute('INSERT INTO transactions (account,timestamp,amount,currency,name,description,category,note,id) VALUES (?,?,?,?,?,?,?,?,NULL)', (theaccount, timestamp, theamount, thecurrency, thename, thedescription, thecategory, thenote))
+    def createTransactionEntry(self, entry):
+        if len(entry) == 0:
+            return None
+
+        thetimestamp = calendar.timegm(datetime.datetime.strptime(entry["date"], '%d.%m.%Y').utctimetuple())
+        self.cursor.execute('INSERT INTO transactions (account,timestamp,amount,currency,name,description,category,note) VALUES (?,?,?,?,?,?,?,?)',
+            [entry["account"], thetimestamp, entry["amount"], entry["currency"], entry["name"], entry["description"], entry["category"], entry["note"]])
         theid = self.cursor.execute('SELECT last_insert_rowid()').fetchone()[0]
         self.conn.commit()
 
-        result = {'id': theid,
-                'timestamp': timestamp,
-                'account': theaccount,
-                'amount': theamount,
-                'currency': thecurrency,
-                'name': thename,
-                'description': thedescription,
-                'category': thecategory,
-                'note': thenote}
+        return theid
 
-        return result
+    def createCategoryEntry(self, entry):
+        ev = None
+        if len(entry["expectedValue"].strip()) != 0:
+            ev = float(entry["expectedValue"])
+        self.cursor.execute('INSERT INTO categories (category,field,pattern,expectedValue,priority) VALUES (?,?,?,?,?)',
+            [entry["category"], entry["field"], entry["pattern"], ev, entry["priority"]])
+        theid = self.cursor.execute('SELECT last_insert_rowid()').fetchone()[0]
+        self.conn.commit()
+
+        return theid
 
     def getAccounts(self):
         q = self.cursor.execute('SELECT DISTINCT account FROM transactions ORDER BY account ASC')
         result = q.fetchall()
         return [i[0] for i in result]
 
-    def getConsolidated(self, byCategory, traceNames, fromDate, toDate, categories, accounts, thepattern=None, categorySelection=None, sortScatterBy='timestamp', legendonlyTraces=None, minAmount=None, maxAmount=None):
-        filecontent = self.getTransactions(accounts=accounts, fromDate=fromDate, toDate=toDate, minAmount=minAmount, maxAmount=maxAmount)
-        duplicatesMap = {}
-        foundDuplicates = []
-
-        allcategoriesNames = []
-        for c in categories:
-            if c['category'] not in allcategoriesNames:
-                allcategoriesNames.append(c['category'])
-
+    def getConsolidated(self, transactions, byCategory, traceNames, sortScatterBy='timestamp', sortScatterByReverse=False, legendonlyTraces=None):
         scatterlist = []
-        allcategories = {}
         sumdict = {}
         incomedict = {}
+        allcategories = {}
 
-        compiledPattern = None
-        if thepattern is not None:
-            compiledPattern = re.compile(thepattern, re.IGNORECASE)
+        for f in transactions:
+            thedate = datetime.datetime.fromtimestamp(f['timestamp'])
+            theX = thedate.strftime('%Y-%m-%d')
 
-        for f in filecontent:
-            if len(f['category']) == 0:
-                dupLine = str(f['timestamp']) + ' ' + str(f['amount']) + ' ' + f['currency'] + ' ' + f['name'] + ' ' + f['description']
-                if dupLine in duplicatesMap:
-                    foundDuplicates.append(html.escape(dupLine))
-                else:
-                    duplicatesMap[dupLine] = True
-                f['category'] = self.findCategory(theitem=f, categories=categories)
-            else:
-                if f['category'] not in allcategoriesNames:
-                    allcategoriesNames.append(f['category'])
+            if byCategory == 'month' or byCategory == 'profit':
+                theX = theX[0:7]
+            elif byCategory == 'year':
+                theX = theX[0:4]
 
-            if (categorySelection is None or f['category'] in categorySelection)\
-                and (compiledPattern is None or compiledPattern.search('|'.join(map(str, f.values())))):
+            f['theX'] = theX
+            scatterlist.append(f)
 
-                thedate = datetime.datetime.fromtimestamp(f['timestamp'])
-                theX = thedate.strftime('%Y-%m-%d')
+            if theX not in sumdict:
+                sumdict[theX] = 0
+            sumdict[theX] += f['amount']
 
-                if byCategory == 'month' or byCategory == 'profit':
-                    theX = theX[0:7]
-                elif byCategory == 'year':
-                    theX = theX[0:4]
+            if f['category'] not in allcategories:
+                allcategories[f['category']] = {}
+            xy = f['amount']
+            if theX in allcategories[f['category']]:
+                xy = xy + allcategories[f['category']][theX]
+            allcategories[f['category']][theX] = xy
 
-                f['theX'] = theX
-                scatterlist.append(f)
+            if f['amount'] > 0:
+                if theX not in incomedict:
+                    incomedict[theX] = 0
+                incomedict[theX] += f['amount']
 
-                if theX not in sumdict:
-                    sumdict[theX] = 0
-                sumdict[theX] += f['amount']
-
-                if f['category'] not in allcategories:
-                    allcategories[f['category']] = {}
-                xy = f['amount']
-                if theX in allcategories[f['category']]:
-                    xy = xy + allcategories[f['category']][theX]
-                allcategories[f['category']][theX] = xy
-                if xy > 0:
-                    if theX not in incomedict:
-                        incomedict[theX] = 0
-                    incomedict[theX] += f['amount']
 
         traces = []
         if 'profit' in traceNames:
@@ -233,6 +222,16 @@ class KontoModel:
                 totalsum = totalsum + sumdict[key]
                 totalprofit['y'].append(totalsum)
             traces.append(totalprofit)
+
+        if 'catsum' in traceNames:
+            catsumtrace = {'x': [], 'y': [], 'name': 'Durchschnitt', 'type': 'bar'}
+            for key in sorted(allcategories.keys(), key=lambda x: x.lower()):
+                catsumtrace['x'].append(key)
+                thissum = 0
+                for a in allcategories[key].keys():
+                    thissum += allcategories[key][a]
+                catsumtrace['y'].append(thissum)
+            traces.append(catsumtrace)
 
         if 'income' in traceNames:
             income = {'x': [], 'y': [], 'name': 'Einkommen', 'type': 'scatter'}
@@ -254,11 +253,27 @@ class KontoModel:
                     thetrace['y'].append(allcategories[key][tracekey])
                 traces.append(thetrace)
 
-        result = {'traces': traces, 'foundDuplicates': foundDuplicates}
+        if 'tracessum' in traceNames:
+            for key in sorted(allcategories.keys(), key=lambda x: x.lower()):
+                thetrace = {'x': [],
+                            'y': [],
+                            'name': key + ' aufsummiert',
+                            'type': 'scatter'}
+                if legendonlyTraces is not None and key in legendonlyTraces:
+                    thetrace["visible"] = "legendonly"
+                for tracekey in sorted(allcategories[key].keys()):
+                    thetrace['x'].append(tracekey)
+                    lastval = 0
+                    if len(thetrace['y']) != 0:
+                        lastval = thetrace['y'][-1]
+                    thetrace['y'].append(lastval + allcategories[key][tracekey])
+                traces.append(thetrace)
+
+        result = {'traces': traces}
         if 'scatter' in traceNames:
             scatter = {'timestamp': [], 'account': [], 'id': [], 'amount': [], 'category': [], 'currency': [], 'name': [], 'description': [], 'note': [], 'theX': []}
             # 'mode': 'markers', 'type': 'scatter', 'visible': 'legendonly', 'name': 'Einzelumsätze', 'text': [], 'marker': {'size': 5, 'opacity': 0.5}
-            scatterlist = sorted(scatterlist, key=lambda x: x[sortScatterBy])
+            scatterlist = sorted(scatterlist, key=lambda x: x[sortScatterBy], reverse=sortScatterByReverse)
             for x in scatterlist:
                 scatter['timestamp'].append(x['timestamp'])
                 scatter['account'].append(x['account'])
@@ -273,92 +288,41 @@ class KontoModel:
                 scatter['theX'].append(x['theX'])
             result['scatter'] = scatter
 
-        result['allcategoriesNames'] = sorted(allcategoriesNames, key=lambda x: x.lower())
         return result
 
-    def updateItem(self, itemId, theaccount=None, thename=None, thedescription=None, theamount=None, thecurrency=None, thecategory=None, thenote=None):
+    def hasEntry(self, tableName, entry):
         sqlparts = []
         sqlparams = []
-        if theaccount is not None:
-            sqlparts.append('account=?')
-            sqlparams.append(theaccount)
-        if thename is not None:
-            sqlparts.append('name=?')
-            sqlparams.append(thename)
-        if thedescription is not None:
-            sqlparts.append('description=?')
-            sqlparams.append(thedescription)
-        if theamount is not None:
-            sqlparts.append('amount=?')
-            sqlparams.append(theamount)
-        if thecurrency is not None:
-            sqlparts.append('currency=?')
-            sqlparams.append(thecurrency)
-        if thecategory is not None:
-            sqlparts.append('category=?')
-            sqlparams.append(thecategory)
-        if thenote is not None:
-            sqlparts.append('note=?')
-            sqlparams.append(thenote)
+        for k, v in entry.items():
+            sqlparts.append(k + '=?')
+            sqlparams.append(v)
+
+        self.cursor.execute('SELECT * FROM ' + tableName + ' WHERE ' + (' AND '.join(sqlparts)), sqlparams)
+        row = self.cursor.fetchone()
+        if row is None:
+            return False
+        return True
+
+    def hasTransactionEntry(self, entry):
+        e = dict(entry)
+        e["timestamp"] = calendar.timegm(datetime.datetime.strptime(e["date"], '%d.%m.%Y').utctimetuple())
+        e.pop("date", None)
+        return self.hasEntry(tableName="transactions", entry=e)
+
+    def updateEntry(self, tableName, theid, entry):
+        sqlparts = []
+        sqlparams = []
+        for k, v in entry.items():
+            sqlparts.append(k + '=?')
+            sqlparams.append(v)
 
         if len(sqlparams) == 0:
             return False
-        sqlparams.append(itemId)
-
-        self.cursor.execute('UPDATE transactions SET ' + (','.join(sqlparts)) + ' WHERE id=?', sqlparams)
+        sqlparams.append(theid)
+        self.cursor.execute('UPDATE ' + tableName + ' SET ' + (','.join(sqlparts)) + ' WHERE rowid=?', sqlparams)
         self.conn.commit()
         return True
 
-    def deleteItem(self, itemId):
-        self.cursor.execute('DELETE FROM transactions WHERE id=?', [itemId])
+    def deleteItem(self, tableName, theid):
+        self.cursor.execute('DELETE FROM ' + tableName + ' WHERE rowid=?', [theid])
         self.conn.commit()
-
-    def convertToItem(self, scatter, pos):
-        return {
-            'date': scatter['date'][i],
-            'account': scatter['account'][i],
-            'amount': scatter['amount'][i],
-            'currency': scatter['currency'][i],
-            'name': scatter['name'][i],
-            'description': scatter['description'][i],
-            'category': scatter['category'][i],
-            'note': scatter['note'][i],
-            'id': scatter['id'][i]
-        }
-
-    def getUncategorizedItems(self, fromDate=None, toDate=None, accounts=None, legendonlyTraces=None, minAmount=None, maxAmount=None):
-        categories = self.parseCategories()
-        consolidated = self.getConsolidated(byCategory='month', traceNames=['scatter'], fromDate=fromDate, toDate=None, categories=categories, accounts=accounts, legendonlyTraces=legendonlyTraces, minAmount=minAmount, maxAmount=maxAmount)
-        scatter = consolidated['scatter']
-
-        result = {}
-        result['allcategoriesNames'] = consolidated['allcategoriesNames']
-        resultItems = {'timestamp': [], 'account': [], 'id': [], 'amount': [], 'category': [], 'currency': [], 'name': [], 'description': [], 'note': [], 'theX': []}
-        for i in range(0, len(scatter['timestamp'])):
-            if scatter['category'][i] == '' or scatter['category'][i] == 'nicht kategorisiert':
-                resultItems['timestamp'].append(scatter['timestamp'][i])
-                resultItems['account'].append(scatter['account'][i])
-                resultItems['id'].append(scatter['id'][i])
-                resultItems['amount'].append(scatter['amount'][i])
-                resultItems['currency'].append(scatter['currency'][i])
-                resultItems['name'].append(scatter['name'][i])
-                resultItems['description'].append(scatter['description'][i])
-                resultItems['category'].append(scatter['category'][i])
-                resultItems['note'].append(scatter['note'][i])
-                resultItems['theX'].append(scatter['theX'][i])
-        result['items'] = resultItems
-        return result
-
-
-if __name__ == "__main__":
-    m = KontoModel('konto.sqlite')
-    #t = m.getTransactions()
-    #print(t)
-
-    #id = m.appendItem(1234, 'theaccount', 3.3, '$', 'test', 'descr', 'category', 'note')
-    #u = m.getUncategorizedItems(accounts=['dkb'])
-    u = m.getUncategorizedItems(fromDate='2018-01-01', toDate='2018-01-03', accounts=['bbb'])
-    for i in u:
-        print(i['id'])
-    m.close()
-

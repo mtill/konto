@@ -6,52 +6,86 @@
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>konto - Übersicht</title>
-  <link rel="stylesheet" type="text/css" href="/static/style.css">
-  <script class="include" type="text/javascript" src="/static/jquery-latest.min.js"></script>
-  <script class="include" type="text/javascript" src="/static/categorize.js"></script>
-  <script src="/static/plotly-latest.min.js"></script>
-  <!-- <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> -->
+  <title>konto</title>
+  <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+  <link rel="stylesheet" type="text/css" href="/static/css/editable.css">
+  <script class="include" type="text/javascript" src="/static/js/editable.js"></script>
+  <script class="include" type="text/javascript" src="/static/js/categorize.js"></script>
+  <!-- <script src="/static/js/plotly-latest.min.js"></script> -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+  <style>
+    #duplicates table tr td:nth-of-type(5) { font-family: monospace; text-align: right; }
+    #details table tr td:nth-of-type(6) { font-family: monospace; text-align: right; }
+
+    @media 
+    only screen and (max-width: 760px),
+    (min-device-width: 768px) and (max-device-width: 1024px)  {
+
+      #details table thead tr.theadtr {
+        display: none;
+      }
+
+      #details table, #details table tbody, #details table td:not(.hidden) {
+        display: block;
+      }
+
+      #duplicates table tr td:nth-of-type(5) { text-align: left; }
+      #details table tr td:nth-of-type(6) { text-align: left; }
+
+      #details table tr td:nth-of-type(2):before { font-family: monospace; white-space: pre; content: "date:        "; }
+      #details table tr td:nth-of-type(3):before { font-family: monospace; white-space: pre; content: "account:     "; }
+      #details table tr td:nth-of-type(4):before { font-family: monospace; white-space: pre; content: "name:        "; }
+      #details table tr td:nth-of-type(5):before { font-family: monospace; white-space: pre; content: "description: "; }
+      #details table tr td:nth-of-type(6):before { font-family: monospace; white-space: pre; content: "amount:      "; }
+      #details table tr td:nth-of-type(7):before { font-family: monospace; white-space: pre; content: "category:    "; }
+      #details table tr td:nth-of-type(8):before { font-family: monospace; white-space: pre; content: "note:        "; }
+    }
+  </style>
 
 <script class="code" type="text/javascript">
+var duplicatesEditable = null;
+var detailsEditable = null;
 var plotData = null;
+var plottitle = "{{title}}";
 detailsParams["byCategory"] = "{{byCategory}}";
 
 function selectAllAccounts(clickedAccount) {
-  var checkItems = !$(clickedAccount).prop("checked");
-  $(".accountCheckbox").each(function() {
-    if ($(this) != clickedAccount) {
-      $(this).prop("checked", checkItems);
+  clickedAccount.checked = true;
+  var q = document.querySelectorAll(".accountCheckbox");
+  for (var i = 0; i < q.length; i++) {
+    if (q[i] != clickedAccount) {
+      q[i].checked = false;
     }
-  });
+  }
 }
 
 function storeDates() {
   var wrongInput = false;
 
-  var minAmount = $("#minAmount").val();
+  var minAmount = document.getElementById("minAmount").value;
   if (minAmount.trim() == "") {
     minAmount = null;
   }
-  var maxAmount = $("#maxAmount").val();
+  var maxAmount = document.getElementById("maxAmount").value;
   if (maxAmount.trim() == "") {
     maxAmount = null;
   }
 
   if (minAmount != null && isNaN(minAmount)) {
-    $("#minAmount").addClass("wrongInput");
+    document.getElementById("minAmount").classList.add("wrongInput");
     wrongInput = true;
   } else {
     minAmount = parseFloat(minAmount);
-    $("#minAmount").removeClass("wrongInput");
+    document.getElementById("minAmount").classList.remove("wrongInput");
   }
 
   if (maxAmount != null && isNaN(maxAmount)) {
-    $("#maxAmount").addClass("wrongInput");
+    document.getElementById("maxAmount").classList.add("wrongInput");
     wrongInput = true;
   } else {
     maxAmount = parseFloat(maxAmount);
-    $("#maxAmount").removeClass("wrongInput");
+    document.getElementById("maxAmount").classList.remove("wrongInput");
   }
 
   if (wrongInput) {
@@ -61,17 +95,18 @@ function storeDates() {
   detailsParams["theX"] = null;
 
   % if showDateSelector:
-  detailsParams["fromDate"] = $("#fromDate").val();
-  detailsParams["toDate"] = $("#toDate").val();
+  detailsParams["fromDate"] = document.getElementById("fromDate").value;
+  detailsParams["toDate"] = document.getElementById("toDate").value;
   % end
 
   detailsParams["accounts"] = [];
-  $(".accountCheckbox").each(function() {
-    if ($(this).prop("checked")) {
-      detailsParams["accounts"].push($(this).val());
+  var q = document.querySelectorAll(".accountCheckbox");
+  for (var i = 0; i < q.length; i++) {
+    if (q[i].checked) {
+      detailsParams["accounts"].push(q[i].value);
     }
-  });
-  detailsParams["patternInput"] = $("#patternInput").val();
+  }
+  detailsParams["patternInput"] = document.getElementById("patternInput").value;
 
   detailsParams["minAmount"] = minAmount;
   detailsParams["maxAmount"] = maxAmount;
@@ -79,13 +114,11 @@ function storeDates() {
   return true;
 }
 
-function onItemCategorized(theid) {
-  // doPlot();
-}
-
 function inoutPlot() {
+  if (plotData === null) {
+    return;
+  }
   traces = plotData["traces"];
-  Plotly.purge("inout")
 
   % if byCategory == 'year':
   %   dtick = 'M12'
@@ -93,19 +126,9 @@ function inoutPlot() {
   %   dtick = 'M1'
   % end
 
-//  var firstDate = traces[0]['x'][0];
-//  for (var i = 1; i < traces.length; i++) {
-//    if (firstDate > traces[i]['x'][0]) {
-//      firstDate = traces[i]['x'][0];
-//    }
-//  }
-//  firstDate = firstDate + "-01"
-
-  //inout = temperature.sort(function(a,b) {return a.name.localeCompare(b.name)});
-  //inout = Plotly.newPlot("temperature", temperature, {title: "Temperatur", xaxis: {range:[theDate+" 00:00:00", theDate+" 23:59:59"]}, yaxis: {title: "Temperatur [°C]"}}, {displaylogo: false});
   inout = Plotly.newPlot("inout",
                          traces,
-                         {title: "{{title}}",
+                         {title: plottitle.replace("%fromDate%", detailsParams["fromDate"]),
                            //hovermode: "closest",
                            barmode: "relative",
                            xaxis: {
@@ -130,9 +153,12 @@ function inoutPlot() {
       }
 
       detailsParams["theX"] = xPos;
+      % if site == 'catsum':
+      detailsParams["xfield"] = "category";
+      % end
       detailsParams["byCategory"] = "{{byCategory}}";
 
-      showDetails(detailsParams);
+      showDetails(detailsEditable, "loading details ...", detailsParams);
       break;
     }
     // console.log(traces.points[i].curveNumber + "  "  + traces.points[i].pointNumber);
@@ -140,40 +166,66 @@ function inoutPlot() {
 }
 
 function doPlot() {
-  //var items = new Array();
-  //$('#filesSelect option:selected').each(function() {
-  //  items.push($(this).val());
-  //});
+  detailsEditable.destroyTable();
+  hideDetailsContainer();
+  Plotly.purge("inout");
+  document.getElementById("inout").innerText = "loading data ...";
 
-  $('#duplicates').html("");
-  $('#details').html("<h2 class=\"clickable\" onclick=\"showDetails(detailsParams)\">Umsätze <img src=\"/static/view-more.png\" alt=\"Details laden\">");
-  //showDetails(detailsParams);
-  $.ajax({
-         type: "POST",
-         url: "/getConsolidated",
-         data: JSON.stringify({byCategory: "{{byCategory}}",
-                               traces: {{! tracesJSON}},
-                               fromDate: detailsParams["fromDate"],
-                               toDate: detailsParams["toDate"],
-                               accounts: detailsParams["accounts"],
-                               patternInput: detailsParams["patternInput"],
-                               minAmount: detailsParams["minAmount"],
-                               maxAmount: detailsParams["maxAmount"]
-                             }),
-         success: function(thedata) {
-           plotData = thedata;
-           if (plotData["foundDuplicates"].length != 0) {
-             $("#duplicates").html("<h2>Mögliche Duplikate gefunden:</h2>\n" + plotData["foundDuplicates"].join('<br>\n')).show();
-           }
-           inoutPlot();
-         },
-         dataType: "json",
-         contentType: "application/json; charset=utf-8"
-       });
+  duplicatesEditable.showInitializingMessage("loading duplicates ...");
+  fetch("/getConsolidated", {
+    method: "POST",
+    body: JSON.stringify({
+      byCategory: "{{byCategory}}",
+      traces: {{! tracesJSON}},
+      fromDate: detailsParams["fromDate"],
+      toDate: detailsParams["toDate"],
+      accounts: detailsParams["accounts"],
+      patternInput: detailsParams["patternInput"],
+      minAmount: detailsParams["minAmount"],
+      maxAmount: detailsParams["maxAmount"]
+    }),
+    headers: {
+      "Content-Type": "application/json; charset=utf-8"
+    }
+  }).then(response => {
+    if (!response.ok) { return response.text().then(m => {throw new Error(m); }) }
+    return response.json();
+  }).then(data => {
+    document.getElementById("inout").innerText = "";
+    plotData = data;
+    duplicatesEditable.showInitializingMessage(null);
+    if (plotData["foundDuplicates"].length != 0) {
+      let duplicatesInitValues = [];
+      for (let c of plotData["foundDuplicates"]) {
+        duplicatesInitValues.push({"id":          c["id"],
+                                   "date":        c['date'],
+                                   "name":        c['name'],
+                                   "description": c['description'],
+                                   "amount":      c['amount'],
+                                   "note":        c['note']});
+      }
+      duplicatesEditable.initializeTable("possible duplicates found", duplicatesInitValues);
+    }
+    inoutPlot();
+  }).catch(error => {
+    document.getElementById("inout").innerText = "error loading data.";
+    duplicatesEditable.showInitializingMessage("error loading duplicates.");
+    window.alert(error);
+  });
+
 }
 
 function refresh() {
+  Plotly.purge("inout");
   inoutPlot();
+}
+
+function settingsFormInput(event) {
+  if (event.keyCode == 13) {
+    submitSettingsForm();
+    return true;
+  }
+  return false;
 }
 
 function submitSettingsForm() {
@@ -185,8 +237,55 @@ function submitSettingsForm() {
   return false;
 }
 
-$(document).ready(function() {
-  $(window).resize(function() {
+function hideDetailsContainer() {
+  document.getElementById('downloadImg').classList.add('hidden');
+  document.getElementById('details').classList.add('hidden');
+}
+
+function showDetailsContainer() {
+  document.getElementById('downloadImg').classList.remove('hidden');
+  document.getElementById('details').classList.remove('hidden');
+  showDetails(detailsEditable, "loading details ...", detailsParams);
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+
+  let duplicatesKeyMap = new Map();
+  duplicatesKeyMap.set("id",          {"type": "hidden",   "inputType": "text"});
+  duplicatesKeyMap.set("date",        {"type": "readonly", "inputType": "date",   "additionalAttributes": {"required": "required"}});
+  duplicatesKeyMap.set("name",        {"type": "readonly", "inputType": "text",   "additionalAttributes": {"size": "20"}});
+  duplicatesKeyMap.set("description", {"type": "readonly", "inputType": "text",   "additionalAttributes": {"size": "50"}});
+  duplicatesKeyMap.set("amount",      {"type": "readonly", "inputType": "number", "additionalAttributes": {"size": "6", "step": "0.1"}});
+  duplicatesKeyMap.set("note",        {"type": "input",    "inputType": "text",   "additionalAttributes": {"size": "10"}});
+
+  duplicatesEditable = new AjaxEditable({thenode:             document.getElementById("duplicates"),
+                                         keyMap:              duplicatesKeyMap,
+                                         errorkey:            "error",
+                                         providedActions:     ["delete", "update"],
+                                         sortable:            true,
+                                         eidkey:              "id",
+                                         baseURI:             "/transactions"});
+
+
+  let keyMap = new Map();
+  keyMap.set("id",          {"type": "hidden",   "inputType": "text"});
+  keyMap.set("date",        {"type": "readonly", "inputType": "date",   "additionalAttributes": {"required": "required"}});
+  keyMap.set("account",     {"type": "readonly", "inputType": "text",   "additionalAttributes": {"size": "4", "required": "required"}});
+  keyMap.set("name",        {"type": "readonly", "inputType": "text",   "additionalAttributes": {"size": "20", "required": "required"}});
+  keyMap.set("description", {"type": "readonly", "inputType": "text",   "additionalAttributes": {"size": "50", "required": "required"}});
+  keyMap.set("amount",      {"type": "readonly", "inputType": "number", "additionalAttributes": {"step": "0.1", "size": "4", "required": "required"}});
+  keyMap.set("category",    {"type": "input",    "inputType": "text",   "additionalAttributes": {"size": "10", "list": "categoriesNames"}});
+  keyMap.set("note",        {"type": "input",    "inputType": "text",   "additionalAttributes": {"size": "10"}});
+
+  detailsEditable = new AjaxEditable({thenode:             document.getElementById("details"),
+                                      keyMap:              keyMap,
+                                      errorkey:            "error",
+                                      providedActions:     ["create", "update", "delete"],
+                                      sortable:            true,
+                                      eidkey:              "id",
+                                      baseURI:             "/transactions"});
+
+  window.addEventListener("resize", function() {
     refresh();
   });
 
@@ -194,7 +293,6 @@ $(document).ready(function() {
   if (validInput) {
     doPlot();
   }
-
 });
 </script>
 
@@ -203,13 +301,19 @@ $(document).ready(function() {
 
 % include('menu.tpl', site=site)
 
+<datalist id="categoriesNames">
+ % for cat in categoriesNames:
+  <option value="{{cat}}">
+ % end
+</datalist>
+
 <fieldset style="margin-top: 0.5em">
 
   <form onsubmit="return submitSettingsForm()">
     <legend>Einstellungen</legend>
     <span style="margin-right: 2em">
       % for a in accounts:
-      <input type="checkbox" class="accountCheckbox" ondblclick="selectAllAccounts($(this))" checked value="{{a}}">{{a}}
+      <input type="checkbox" class="accountCheckbox" ondblclick="selectAllAccounts(this)" checked value="{{a}}">{{a}}
       % end
     </span>
 
@@ -223,18 +327,21 @@ $(document).ready(function() {
     <span style="margin-left: 2em">Datum: <input type="date" id="fromDate" value="{{fromDate}}"> - <input type="date" id="toDate" value="{{toDate}}"></span>
     % end
 
-    <span style="margin-left: 2em">Betrag: <input type="text" id="minAmount" size="5" placeholder="min" value=""> - <input type="text" id="maxAmount" size="5" placeholder="max" value=""></span>
+    <span style="margin-left: 2em">amount: <input type="text" id="minAmount" size="5" placeholder="min" value="" onkeyup="settingsFormInput(event)"> - <input type="text" id="maxAmount" size="5" placeholder="max" value="" onkeyup="settingsFormInput(event)"></span>
 
-    <span style="margin-left: 2em">Suche: <input type="text" size="10" id="patternInput" placeholder="Filter" value=""></span>
+    <span style="margin-left: 2em">search: <input type="text" size="10" id="patternInput" placeholder="Filter" value="" onkeyup="settingsFormInput(event)"></span>
 
-    <input type="submit" value="Umsätze anzeigen / aktualisieren" style="margin-left:2em">
+    <input type="submit" value="load" style="margin-left:2em">
   </form>
 </fieldset>
 
 <div style="min-width:400pt;width:100%" id="inout"></div>
-<p id="duplicates"></p>
-<p id="details"></p>
+<p id="duplicates" class="scrollable"></p>
 
-<p style="color: lightgray;margin-top: 3em;margin-left:1em">konto &mdash; &copy;<a href="https://github.com/mtill/konto" target="_blank" style="text-decoration:none;color: lightgray">Michael Till Beck</a>, 2018</p>
+<h2>details <img src="/static/img/view-more.png" class="clickable" onclick="showDetailsContainer()" alt="load details"> <img id="downloadImg" src="/static/img/download.png" class="clickable" onclick="doDownload(detailsParams)" alt="download CSV"></h2>
+<div id="details" class="scrollable"></div>
+
+<p style="color: lightgray;margin-top: 3em;margin-left:1em">konto &mdash; &copy;<a href="https://github.com/mtill/konto" target="_blank" style="text-decoration:none;color: lightgray">Michael Till Beck</a>, 2018-2020</p>
 </body>
 </html>
+

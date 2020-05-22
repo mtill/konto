@@ -1,0 +1,60 @@
+table.editable {
+  max-width: 100%;
+  border-collapse: collapse;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+table.editable th {
+  background-color: #E0E0E0;
+  color: black;
+  text-align: left;
+}
+table.editable th, table.editable td {
+  border: none;
+  padding: 3px;
+}
+table.editable td.actions {
+  display: inline-block;
+  white-space: nowrap;
+}
+table.editable tr.modified {
+  border: 3px solid lightgreen;
+}
+table.editable td.modified * {
+  background-color: lightgreen;
+}
+table.editable td.hidden, table.editable th.hidden {
+  display: none;
+}
+table.editable tr.modified .showWhenModified {
+  visibility: visible;
+}
+table.editable tr .showWhenModified {
+  visibility: hidden;
+}
+table.editable tr:nth-child(odd){
+  background-color: #f2f2f2;
+}
+table.editable tr:hover:not(.error) {
+  background-color: #ddd;
+}
+table.editable td img {
+  vertical-align: middle;
+}
+
+table.editable input {
+  border: 1px solid #555;
+}
+table.editable input:focus {
+  background-color: lightgreen;
+}
+table.editable input.wrongInput {
+  background-color: #FB7373;
+}
+table.editable tr.error {
+  background-color: red;
+}
+
