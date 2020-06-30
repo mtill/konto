@@ -63,10 +63,10 @@
                                           baseURI:              "/transactions"});
 
 
-      detailsParams["categorySelection"] = ["nicht kategorisiert"];
+      detailsParams["categorySelection"] = ["not categorized"];
       detailsParams["fromDate"] = "{{fromDate}}";
       detailsParams["toDate"] = "{{toDate}}";
-      showDetails(detailsEditable, "loading details ...", detailsParams);
+      showDetails(detailsEditable, null, null, detailsParams)
     });
 
   </script>
@@ -85,10 +85,10 @@
   <div id="categories" class="scrollable"></div>
   <hr>
 
-  <h2>un-categorized transactions (excerpt) <img id="downloadImg" src="/static/img/download.png" class="clickable" onclick="doDownload(detailsParams)" alt="download CSV"></h2>
+  <h2>un-categorized transactions (excerpt)</h2>
   <div id="details" style="margin-top:2em" class="scrollable"></div>
 
-  <p style="color: lightgray;margin-top: 3em;margin-left:1em">konto &mdash; &copy;<a href="https://github.com/mtill/konto" target="_blank" style="text-decoration:none;color: lightgray">Michael Till Beck</a>, 2018-2020</p>
+  <p style="color: lightgray;margin-top: 3em;margin-left:1em">&copy; konto &mdash 2018-2020</p>
  </body>
 </html>
 

@@ -21,6 +21,7 @@ class Editable {
       this.tbody = null;
       this.colToKey = null;
       this.msgnode = null;
+      this.title = "";
     }
 
     destroyTable() {
@@ -31,6 +32,7 @@ class Editable {
       this.thead = null;
       this.tbody = null;
       this.showInitializingMessage(null);
+      this.title = "";
     }
 
     showInitializingMessage(msgtext) {
@@ -49,6 +51,27 @@ class Editable {
       }
     }
 
+    downloadTable(theformat) {
+      if (theformat != "csv" && theformat != "json") {
+        window.alert("invalid format: " + theformat);
+        return;
+      }
+
+      let data = this.parseTable("csv");
+      let newBlob = new Blob([data], {type: "text/" + theformat + "; charset=utf-8"});
+      let blobdata = window.URL.createObjectURL(newBlob);
+      let thelink = document.createElement('a');
+      thelink.href = blobdata;
+      thelink.style.display = "none";
+      thelink.download = "download_" + this.title.replace(/\s/g, "-") + ".csv";
+      document.getElementsByTagName("body")[0].appendChild(thelink);
+      thelink.click();
+      setTimeout(function() {
+          window.URL.revokeObjectURL(blobdata);
+          document.getElementsByTagName("body")[0].removeChild(thelink);
+      }, 5000);  
+    }
+
     initializeTable(title, entries) {
       let s = this;
       this.destroyTable();
@@ -58,9 +81,19 @@ class Editable {
       this.thetable.classList.add("editable");
 
       if (title !== null) {
+        this.title = title;
         let cap = document.createElement("caption");
-        cap.innerText = title;
         this.thetable.appendChild(cap);
+        cap.innerText = title.trim();
+        let downloadLink = document.createElement("span");
+        downloadLink.classList.add("clickable");
+        downloadLink.classList.add("downloadTable");
+        downloadLink.title = "download CSV";
+        downloadLink.innerText = "↡";   // "⮋";
+        downloadLink.addEventListener("click", function() {
+          s.downloadTable("csv");
+        });
+        cap.appendChild(downloadLink);
       }
 
       let thead = document.createElement("thead");
@@ -129,7 +162,7 @@ class Editable {
       }
       this.keyMap.get(thekey)["th"].innerText = thekey + symb;
 
-      /*let entries = this.parseTable();
+      /*let entries = this.parseTable("json");
       if (doReverse) {
         entries.reverse(function(a, b) {
           return a[thekey].localeCompare(b[thekey]);
@@ -243,7 +276,8 @@ class Editable {
         actiontd.classList.add("ignoreexport");
 
         if (this.providedActions.includes("update")) {
-          let submitChanges = document.createElement("img");
+          let submitChanges = document.createElement("span");
+          submitChanges.innerText = "✔";
           submitChanges.classList.add("clickable");
           submitChanges.classList.add("showWhenModified");
           actiontd.appendChild(submitChanges);
@@ -262,15 +296,14 @@ class Editable {
               s.updateEntry(ttr);
             });
           }
-          submitChanges.src = "/static/img/ok.png";
         }
 
         if (this.providedActions.includes("delete") && entryJSON !== null) {
-          let removespan = document.createElement("img");
+          let removespan = document.createElement("span");
+          removespan.innerText = "✘";
           removespan.classList.add("clickable");
           actiontd.appendChild(removespan);
           removespan.addEventListener("click", function() {s.removeEntry(this.parentNode.parentNode);});
-          removespan.src = "/static/img/delete.png";
         }
 
         /*let upspan = document.createElement("img");
@@ -354,17 +387,48 @@ class Editable {
       return h;
     }
 
-    parseTable() {
-      let rows = this.tbody.querySelectorAll('tr');
-      let data = [];
+    _escapeCSVLine(line) {
+      // return line.map(function(ele) {return "\"" + ele.replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + "\"";}).join(";");
+      return line.map(function(ele) {return "\"" + ele.replace(/"/g, "\"\"") + "\"";}).join(";");
+    }
+    
+    parseTable(theformat) {
       let s = this;
+      let data = [];
+
+      if (theformat != "csv" && theformat != "json") {
+        window.alert("invalid format: " + theformat);
+        return;
+      }
+
+      let sortedKeys = [];
+      let firstline = [];
+      for (const k of this.keyMap.keys()) {
+        sortedKeys.push(k);
+        if (theformat == "csv") {
+          firstline.push(k);
+        }
+      }
+
+      let rows = this.tbody.querySelectorAll('tr');
       rows.forEach(function(tre) {
         if (!tre.classList.contains("ignoreexport")) {
-          data.push(s.parseRow(tre, false, false));
+          let parsedRow = s.parseRow(tre, false, false);
+          if (theformat == "json") {
+            data.push(parsedRow);
+          } else {
+            let line = [];
+            for (let thekey of sortedKeys) {
+              line.push(parsedRow[thekey]);
+            }
+            data.push(s._escapeCSVLine(line));
+          }
         }
       });
 
-      //document.getElementById("jsoncontent").value = JSON.stringify(data);
+      if (theformat == "csv") {
+        return s._escapeCSVLine(firstline) + "\n" + data.join("\n");
+      }
       return data;
     }
 

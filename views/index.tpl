@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
 % import datetime
-% showDateSelector = True   #byCategory != 'year'
+% showDateSelector = True
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -46,9 +46,10 @@
 <script class="code" type="text/javascript">
 var duplicatesEditable = null;
 var detailsEditable = null;
+var transactionsByCategoryEditable = null;
+var transactionsByNameEditable = null;
+
 var plotData = null;
-var plottitle = "{{title}}";
-detailsParams["byCategory"] = "{{byCategory}}";
 
 function selectAllAccounts(clickedAccount) {
   clickedAccount.checked = true;
@@ -111,6 +112,33 @@ function storeDates() {
   detailsParams["minAmount"] = minAmount;
   detailsParams["maxAmount"] = maxAmount;
 
+  detailsParams["groupBy"] = document.getElementById("groupBy").value;
+
+  if (document.getElementById("accumulated").checked) {
+    detailsParams["traces"] = ['profit', 'profitaccumulated'];
+    if (document.getElementById("classifyBy").value == "name") {
+      detailsParams["traces"].push('nametracesaccumulated');
+    } else if (document.getElementById("classifyBy").value == "category") {
+      detailsParams["traces"].push('tracesaccumulated');
+    }
+
+    detailsParams["plotTitle"] = "accumulated debits and credits (starting from " + detailsParams["fromDate"] + ")";
+  } else {
+    detailsParams["traces"] = ['profit'];
+    if (document.getElementById("classifyBy").value == "name") {
+      detailsParams["traces"].push('nametraces');
+    } else if (document.getElementById("classifyBy").value == "category") {
+      detailsParams["traces"].push('traces');
+    }
+
+    detailsParams["plotTitle"] = "debits and credits";
+  }
+
+  detailsParams["barmode"] = "group";
+  if (document.getElementById("barmode").checked) {
+    detailsParams["barmode"] = "relative";
+  }
+
   return true;
 }
 
@@ -120,20 +148,16 @@ function inoutPlot() {
   }
   traces = plotData["traces"];
 
-  % if byCategory == 'year':
-  %   dtick = 'M12'
-  % else:
-  %   dtick = 'M1'
-  % end
+  let dtick = "M1"; //M12
 
   inout = Plotly.newPlot("inout",
                          traces,
-                         {title: plottitle.replace("%fromDate%", detailsParams["fromDate"]),
+                         {title: detailsParams["plotTitle"],
                            //hovermode: "closest",
-                           barmode: "relative",
+                           barmode: detailsParams["barmode"],
                            xaxis: {
                              // tick0: firstDate,
-                             dtick: "{{dtick}}"
+                             dtick: dtick
                            },
                            yaxis: {title: "Euro"},
                            legend: {traceorder: "normal"}
@@ -153,12 +177,8 @@ function inoutPlot() {
       }
 
       detailsParams["theX"] = xPos;
-      % if site == 'catsum':
-      detailsParams["xfield"] = "category";
-      % end
-      detailsParams["byCategory"] = "{{byCategory}}";
 
-      showDetails(detailsEditable, "loading details ...", detailsParams);
+      showDetailsContainer();
       break;
     }
     // console.log(traces.points[i].curveNumber + "  "  + traces.points[i].pointNumber);
@@ -167,23 +187,18 @@ function inoutPlot() {
 
 function doPlot() {
   detailsEditable.destroyTable();
+  duplicatesEditable.showInitializingMessage("loading duplicates ...");
+
+  transactionsByCategoryEditable.destroyTable();
+  transactionsByNameEditable.destroyTable();
+
   hideDetailsContainer();
   Plotly.purge("inout");
   document.getElementById("inout").innerText = "loading data ...";
 
-  duplicatesEditable.showInitializingMessage("loading duplicates ...");
   fetch("/getConsolidated", {
     method: "POST",
-    body: JSON.stringify({
-      byCategory: "{{byCategory}}",
-      traces: {{! tracesJSON}},
-      fromDate: detailsParams["fromDate"],
-      toDate: detailsParams["toDate"],
-      accounts: detailsParams["accounts"],
-      patternInput: detailsParams["patternInput"],
-      minAmount: detailsParams["minAmount"],
-      maxAmount: detailsParams["maxAmount"]
-    }),
+    body: JSON.stringify(detailsParams),
     headers: {
       "Content-Type": "application/json; charset=utf-8"
     }
@@ -204,8 +219,9 @@ function doPlot() {
                                    "amount":      c['amount'],
                                    "note":        c['note']});
       }
-      duplicatesEditable.initializeTable("possible duplicates found", duplicatesInitValues);
+      duplicatesEditable.initializeTable("possible duplicates", duplicatesInitValues);
     }
+
     inoutPlot();
   }).catch(error => {
     document.getElementById("inout").innerText = "error loading data.";
@@ -238,17 +254,25 @@ function submitSettingsForm() {
 }
 
 function hideDetailsContainer() {
-  document.getElementById('downloadImg').classList.add('hidden');
   document.getElementById('details').classList.add('hidden');
 }
 
 function showDetailsContainer() {
-  document.getElementById('downloadImg').classList.remove('hidden');
   document.getElementById('details').classList.remove('hidden');
-  showDetails(detailsEditable, "loading details ...", detailsParams);
+  showDetails(detailsEditable, transactionsByCategoryEditable, transactionsByNameEditable, detailsParams)
+}
+
+function validateForm() {
+  if (document.getElementById('accumulated').checked) {
+    document.getElementById('barmode').disabled = true;
+    document.getElementById('barmode').checked = false;
+  } else {
+    document.getElementById('barmode').disabled = false;
+  }
 }
 
 document.addEventListener("DOMContentLoaded", function() {
+  validateForm();
 
   let duplicatesKeyMap = new Map();
   duplicatesKeyMap.set("id",          {"type": "hidden",   "inputType": "text"});
@@ -285,6 +309,25 @@ document.addEventListener("DOMContentLoaded", function() {
                                       eidkey:              "id",
                                       baseURI:             "/transactions"});
 
+  let transactionsByCategoryKeyMap = new Map();
+  transactionsByCategoryKeyMap.set("category",        {"type": "readonly", "inputType": "text",   "additionalAttributes": {"size": "20"}});
+  transactionsByCategoryKeyMap.set("sum",             {"type": "readonly", "inputType": "number", "additionalAttributes": {"size": "6", "step": "0.1"}});
+  transactionsByCategoryEditable = new Editable({thenode:  document.getElementById("details"),
+                                      keyMap:              transactionsByCategoryKeyMap,
+                                      errorkey:            "error",
+                                      providedActions:     [],
+                                      sortable:            true});
+
+  let transactionsByNameKeyMap = new Map();
+  transactionsByNameKeyMap.set("name",            {"type": "readonly", "inputType": "text",   "additionalAttributes": {"size": "20"}});
+  transactionsByNameKeyMap.set("sum",             {"type": "readonly", "inputType": "number", "additionalAttributes": {"size": "6", "step": "0.1"}});
+  transactionsByNameEditable = new Editable({thenode:      document.getElementById("details"),
+                                      keyMap:              transactionsByNameKeyMap,
+                                      errorkey:            "error",
+                                      providedActions:     [],
+                                      sortable:            true});
+
+
   window.addEventListener("resize", function() {
     refresh();
   });
@@ -310,38 +353,63 @@ document.addEventListener("DOMContentLoaded", function() {
 <fieldset style="margin-top: 0.5em">
 
   <form onsubmit="return submitSettingsForm()">
-    <legend>Einstellungen</legend>
-    <span style="margin-right: 2em">
-      % for a in accounts:
-      <input type="checkbox" class="accountCheckbox" ondblclick="selectAllAccounts(this)" checked value="{{a}}">{{a}}
+    <legend>settings</legend>
+
+    <div>
+
+      <span style="margin-right: 1em">
+        % for a in accounts:
+        <input type="checkbox" class="accountCheckbox" ondblclick="selectAllAccounts(this)" checked value="{{a}}">{{a}}
+        % end
+      </span>
+
+      % if showDateSelector:
+      %   fromDate = (datetime.datetime.today() - datetime.timedelta(days=5*30)).replace(day=1).strftime('%Y-%m-%d')
+      %   toDate = datetime.datetime.today().strftime('%Y-%m-%d')
+      <span style="margin-left: 1em">date: <input type="date" id="fromDate" value="{{fromDate}}"> - <input type="date" id="toDate" value="{{toDate}}"></span>
       % end
-    </span>
 
-    % if showDateSelector:
-    %   if byCategory == 'year':
-    %     fromDate = '2000-01-01'
-    %   else:
-    %     fromDate = (datetime.datetime.today() - datetime.timedelta(days=5*30)).replace(day=1).strftime('%Y-%m-%d')
-    %   end
-    %   toDate = datetime.datetime.today().strftime('%Y-%m-%d')
-    <span style="margin-left: 2em">Datum: <input type="date" id="fromDate" value="{{fromDate}}"> - <input type="date" id="toDate" value="{{toDate}}"></span>
-    % end
+      <span style="margin-left: 1em">amount: <input type="text" id="minAmount" size="3" placeholder="min" value="" onkeyup="settingsFormInput(event)"> - <input type="text" id="maxAmount" size="3" placeholder="max" value="" onkeyup="settingsFormInput(event)"></span>
 
-    <span style="margin-left: 2em">amount: <input type="text" id="minAmount" size="5" placeholder="min" value="" onkeyup="settingsFormInput(event)"> - <input type="text" id="maxAmount" size="5" placeholder="max" value="" onkeyup="settingsFormInput(event)"></span>
+      <span style="margin-left: 1em">pattern: <input type="text" size="10" id="patternInput" placeholder="Filter" value="" onkeyup="settingsFormInput(event)"></span>
 
-    <span style="margin-left: 2em">search: <input type="text" size="10" id="patternInput" placeholder="Filter" value="" onkeyup="settingsFormInput(event)"></span>
+    </div><div>
 
-    <input type="submit" value="load" style="margin-left:2em">
+      <span style="margin-left: 1em">classify by:
+        <select name="classifyBy" id="classifyBy">
+          <option value="category">category</option>
+          <option value="name">name</option>
+        </select>
+      </span>
+
+      <span style="margin-left: 1em">group by:
+        <select name="groupBy" id="groupBy">
+          <option value="week">week</option>
+          <option value="month" selected>month</option>
+          <option value="quarter">quarter</option>
+          <option value="year">year</option>
+        </select>
+      </span>
+
+      % if site != "sum":
+      <span style="margin-left: 1em"><input id="barmode" type="checkbox" checked>stacked</span>
+      % end
+
+      <span style="margin-left: 1em"><input id="accumulated" type="checkbox" onchange="validateForm()">accumulated</span>
+
+      <input type="submit" value="go" style="margin-left:1em">
+    </div>
+
   </form>
 </fieldset>
 
 <div style="min-width:400pt;width:100%" id="inout"></div>
 <p id="duplicates" class="scrollable"></p>
 
-<h2>details <img src="/static/img/view-more.png" class="clickable" onclick="showDetailsContainer()" alt="load details"> <img id="downloadImg" src="/static/img/download.png" class="clickable" onclick="doDownload(detailsParams)" alt="download CSV"></h2>
-<div id="details" class="scrollable"></div>
+<h2>details <img src="/static/img/view-more.png" class="clickable" onclick="showDetailsContainer()" alt="Details laden"></h2>
+<div id="details"></div>
 
-<p style="color: lightgray;margin-top: 3em;margin-left:1em">konto &mdash; &copy;<a href="https://github.com/mtill/konto" target="_blank" style="text-decoration:none;color: lightgray">Michael Till Beck</a>, 2018-2020</p>
+<p style="color: lightgray;margin-top: 3em;margin-left:1em">&copy; konto &mdash 2018-2020</p>
 </body>
 </html>
 

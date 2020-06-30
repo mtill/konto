@@ -8,11 +8,11 @@ import datetime
 import dateutil.relativedelta
 import calendar
 import json
+import csv
 import sys
 import re
 import os
 import io
-import csv
 import codecs
 import locale
 import json
@@ -43,29 +43,30 @@ def server_static(thefilename):
 
 
 @app.route('/')
-@app.route('/byCategory/<byCategory>')
 @auth_basic(check_pass)
-def indexFile(byCategory='month'):
+def indexFile():
     k = getKonto()
     accounts = k.getAccounts()
     categoriesNames = k.getCategoriesNames()
-    return template('index.tpl', title='Ausgaben', site=byCategory, byCategory=byCategory, tracesJSON=json.dumps(['traces', 'profit']), accounts=accounts, categoriesNames=categoriesNames)
+    return template('index.tpl', title="debits and credits", site='index', accounts=accounts, categoriesNames=categoriesNames)
 
 
-@app.route('/sum')
-@auth_basic(check_pass)
-def profit():
-    k = getKonto()
-    accounts = k.getAccounts()
-    categoriesNames = k.getCategoriesNames()
-    return template('index.tpl', title='Aufsummiert seit %fromDate%', site='sum', byCategory='month', tracesJSON=json.dumps(['profit', 'totalprofit', 'tracessum']), accounts=accounts, categoriesNames=categoriesNames)
+def buildTitle(categorySelection, fromDate, toDate):
+    title = ''
+    if categorySelection is not None:
+        if len(categorySelection) == 1:
+            title = title + template(', category "{{x}}"', x=categorySelection[0])
+        elif len(categorySelection) > 1:
+            title = title + template(', categories {{x}}', x=(", ".join(categorySelection)))
+    title = title + ' (' + fromDate.strftime("%Y-%m-%d") + " - " + toDate.strftime("%Y-%m-%d") + ")"
+    return title
 
 
 @app.route('/getConsolidated', method="POST")
 @auth_basic(check_pass)
 def getConsolidated():
     k = getKonto()
-    byCategory = request.json.get('byCategory')
+    groupBy = request.json.get('groupBy')
     traces = request.json.get('traces')
 
     fromDateJSON = request.json.get('fromDate', None)
@@ -85,21 +86,48 @@ def getConsolidated():
     minAmount = request.json.get('minAmount', None)
     maxAmount = request.json.get('maxAmount', None)
 
-    legendonlyTraces = ["Umbuchung", "Gehalt"]
+    legendonlyTraces = ["transfer", "income"]
     transactions = k.getTransactions(accounts=accounts, fromDate=fromDate, toDate=toDate, minAmount=minAmount, maxAmount=maxAmount, categorySelection=None, thepattern=thepattern)
-    consolidated = k.getConsolidated(transactions=transactions["transactions"], byCategory=byCategory, traceNames=traces, sortScatterBy='timestamp', sortScatterByReverse=True, legendonlyTraces=legendonlyTraces)
+    consolidated = k.getConsolidated(transactions=transactions["transactions"], groupBy=groupBy, traceNames=traces, sortScatterBy='timestamp', sortScatterByReverse=True, legendonlyTraces=legendonlyTraces)
+
+    thetraces = []
+    for t in consolidated['traces'].values():
+        thetraces.extend(t)
 
     # return json.dumps(request.json.get('items'))
-    return json.dumps({'traces': consolidated['traces'], 'foundDuplicates': transactions['foundDuplicates']})
+    return json.dumps({'traces': thetraces,
+                       'title': buildTitle(categorySelection=None, fromDate=fromDate, toDate=toDate),
+                       'foundDuplicates': transactions['foundDuplicates']
+                       })
+
+
+def _prepareTraces(traces, nametraces):
+    transactionsByName = nametraces
+    transactionsByNameOverview = []
+    for transactionByName in transactionsByName:
+        y = 0.0
+        values = transactionByName["y"]
+        for i in range(0, len(values)):
+            y += values[i]
+        transactionsByNameOverview.append({"name": transactionByName["name"], "sumint": y, "sum": "{:.2f}".format(y)})
+    transactionsByNameOverview = sorted(transactionsByNameOverview, key=lambda x: x["sumint"])
+
+    categoryOverview = []
+    for trace in traces:
+        category = trace["name"]
+        y = 0.0
+        for i in range(0, len(trace["y"])):
+            y += trace["y"][i]
+        categoryOverview.append({"category": category, "sumint": y, "sum": "{:.2f}".format(y)})
+    categoryOverview = sorted(categoryOverview, key=lambda co: co["sumint"])
+    return {"transactionsByName": transactionsByNameOverview, "transactionsByCategory": categoryOverview}
 
 
 @app.route('/transactions/getDetails', method="POST")
 @auth_basic(check_pass)
 def getDetails():
     k = getKonto()
-    theX = request.json.get('theX')
-    xfield = request.json.get('xfield', 'theX')
-    byCategory = request.json.get('byCategory')
+    groupBy = request.json.get('groupBy')
 
     fromDateJSON = request.json.get('fromDate', None)
     fromDate = None
@@ -111,6 +139,40 @@ def getDetails():
     if toDateJSON is not None:
         toDate = datetime.datetime.strptime(toDateJSON + " 23:59:59.999999", '%Y-%m-%d %H:%M:%S.%f')
 
+    theX = request.json.get('theX')
+    if theX is not None:
+        if groupBy == 'week':
+            xfrom = datetime.datetime.strptime(theX + " 1 00:00:00.000000", '%G-week %V %w %H:%M:%S.%f')
+            xto = xfrom + datetime.timedelta(days=6)
+            xto = datetime.datetime(year=xto.year, month=xto.month, day=xto.day, hour=23, minute=59, second=59, microsecond=999999)
+
+        elif groupBy == 'month':
+            xfrom = datetime.datetime.strptime(theX + "-01 00:00:00.000000", '%Y-%m-%d %H:%M:%S.%f')
+            _, num_days = calendar.monthrange(xfrom.year, xfrom.month)
+            xto = datetime.datetime(year=xfrom.year, month=xfrom.month, day=num_days, hour=23, minute=59, second=59, microsecond=999999)
+
+        elif groupBy == 'quarter':
+            quarterPattern = re.compile('(\d\d\d\d)-quarter (\d+)')
+            quarterMatch = quarterPattern.match(theX)
+            theyearint = int(quarterMatch.group(1))
+            thequarter = quarterMatch.group(2)
+            themonthint = ((int(thequarter) - 1) * 3) + 1
+            thelastmonthint = themonthint + 2
+
+            xfrom = datetime.datetime(year=theyearint, month=themonthint, day=1, hour=0, minute=0, second=0, microsecond=0)
+            _, num_days = calendar.monthrange(theyearint, thelastmonthint)
+            xto = datetime.datetime(year=theyearint, month=thelastmonthint, day=num_days, hour=23, minute=59, second=59, microsecond=999999)
+
+        elif groupBy == 'year':
+            xfrom = datetime.datetime.strptime(theX + "-01-01 00:00:00.000000", '%Y-%m-%d %H:%M:%S.%f')
+            _, num_days = calendar.monthrange(xfrom.year, 12)
+            xto = datetime.datetime(year=xfrom.year, month=12, day=num_days, hour=23, minute=59, second=59, microsecond=999999)
+
+        if xfrom > fromDate:
+            fromDate = xfrom
+        if xto < toDate:
+            toDate = xto
+
     accounts = request.json.get('accounts')
     patternInput = request.json.get('patternInput')
     thepattern = None if patternInput is None or len(patternInput) == 0 else patternInput
@@ -119,73 +181,41 @@ def getDetails():
     sortScatterBy = request.json.get('sortScatterBy')
     sortScatterByReverse = request.json.get('sortScatterByReverse')
 
-    csvexport = request.json.get('csvexport', False)
+    title = buildTitle(categorySelection=categorySelection, fromDate=fromDate, toDate=toDate)
 
-    title = 'Umsätze'
-    if categorySelection is not None:
-        if len(categorySelection) == 1:
-            title = title + template(' der Kategorie "{{x}}"', x=categorySelection[0])
-        elif len(categorySelection) > 1:
-            title = title + template(' der Kategorien {{x}}', x=(", ".join(categorySelection)))
-
-    if theX is not None:
-        title = title + template(' für {{theX}}', theX=theX)
     minAmount = request.json.get('minAmount', None)
     maxAmount = request.json.get('maxAmount', None)
 
-    legendonlyTraces = ["Umbuchung", "Gehalt"]
+    legendonlyTraces = ["transfer", "income"]
     transactions = k.getTransactions(accounts=accounts, fromDate=fromDate, toDate=toDate, minAmount=minAmount, maxAmount=maxAmount, categorySelection=categorySelection, thepattern=thepattern)
-    consolidated = k.getConsolidated(transactions=transactions["transactions"], byCategory=byCategory, traceNames=['scatter'], sortScatterBy=sortScatterBy, sortScatterByReverse=sortScatterByReverse, legendonlyTraces=legendonlyTraces)
+    consolidated = k.getConsolidated(transactions=transactions["transactions"], groupBy=groupBy, traceNames=['scatter', 'traces', 'nametraces'], sortScatterBy=sortScatterBy, sortScatterByReverse=sortScatterByReverse, legendonlyTraces=legendonlyTraces)
 
     thescatter = consolidated['scatter']
-    if csvexport:
-        cwriterresult = io.StringIO()
-        cwriter = csv.DictWriter(cwriterresult, fieldnames=['id', 'date', 'x', 'account', 'amount', 'currency', 'name', 'description', 'category', 'note'], delimiter=',')
-        cwriter.writeheader()
-        for i in range(0, len(thescatter['timestamp'])):
-            if theX is None or theX == thescatter['theX'][i]:
-                mydate = datetime.datetime.fromtimestamp(thescatter['timestamp'][i]).strftime('%Y-%m-%d')
-                cwriter.writerow({'date': mydate,
-                                'account': thescatter['account'][i],
-                                'id': thescatter['id'][i],
-                                'amount': thescatter['amount'][i],
-                                'currency': thescatter['currency'][i],
-                                'name': thescatter['name'][i],
-                                'description': thescatter['description'][i],
-                                'category': thescatter['category'][i],
-                                'note': thescatter['note'][i],
-                                'x': thescatter['theX'][i]})
-        cwriterresultstr = cwriterresult.getvalue()
-        cwriterresult.close()
-        return cwriterresultstr
-    else:
-        result = []
-        for i in range(0, len(thescatter['timestamp'])):
-            if theX is None or theX == thescatter['theX'][i]:
-                mydate = datetime.datetime.fromtimestamp(thescatter['timestamp'][i]).strftime('%Y-%m-%d')
-                result.append({ 'date': mydate,
-                                'account': thescatter['account'][i],
-                                'id': thescatter['id'][i],
-                                'amountint': thescatter['amount'][i],
-                                'amount': "{:.2f}".format(thescatter['amount'][i]),
-                                'currency': thescatter['currency'][i],
-                                'name': thescatter['name'][i],
-                                'description': thescatter['description'][i],
-                                'category': thescatter['category'][i],
-                                'note': thescatter['note'][i],
-                                'x': thescatter['theX'][i]})
-        return json.dumps({"title": title, "data": result})
+    validatedRules = k.validateRules(transactions=transactions)
+    preparedTraces = _prepareTraces(traces=consolidated["traces"]["traces"], nametraces=consolidated["traces"]["nametraces"])
+
+    result = []
+    for i in range(0, len(thescatter['timestamp'])):
+        mydate = datetime.datetime.fromtimestamp(thescatter['timestamp'][i]).strftime('%Y-%m-%d')
+        result.append({ 'date': mydate,
+                        'account': thescatter['account'][i],
+                        'id': thescatter['id'][i],
+                        'amountint': thescatter['amount'][i],
+                        'amount': "{:.2f}".format(thescatter['amount'][i]),
+                        'currency': thescatter['currency'][i],
+                        'name': thescatter['name'][i],
+                        'description': thescatter['description'][i],
+                        'category': thescatter['category'][i],
+                        'note': thescatter['note'][i],
+                        'x': thescatter['theX'][i]})
+    return json.dumps({"title": title, "data": result, "validatedRules": validatedRules, "transactionsByName": preparedTraces["transactionsByName"], "transactionsByCategory": preparedTraces["transactionsByCategory"]})
 
 
 @app.route('/check/<yearmonth>/<lastMonths>/<includeHeader>')
 @auth_basic(check_pass)
 def check(yearmonth, lastMonths, includeHeader):
-    result = {}
     k = getKonto()
     categories = k.parseCategories()
-    categoryOverview = {}
-    transactionsByNameOverview = {}
-    profitOverview = {}
     rules = []
     for c in categories:
         if c["expectedValue"] is not None:
@@ -197,6 +227,7 @@ def check(yearmonth, lastMonths, includeHeader):
     else:
         firstDayOfMonth = datetime.datetime.strptime(yearmonth, "%Y-%m")
 
+    aggregatedDetails = {}
     for i in range(0, int(lastMonths)):
         firstDayOfMonth = datetime.datetime(year=firstDayOfMonth.year, month=firstDayOfMonth.month, day=1, hour=0, minute=0, second=0, microsecond=0)
 
@@ -204,53 +235,18 @@ def check(yearmonth, lastMonths, includeHeader):
             _, num_days = calendar.monthrange(firstDayOfMonth.year, firstDayOfMonth.month)
             lastDayOfMonth = datetime.datetime(year=firstDayOfMonth.year, month=firstDayOfMonth.month, day=num_days, hour=23, minute=59, second=59, microsecond=999999)
             monthString = firstDayOfMonth.strftime("%m/%Y")
-            result[monthString] = []
 
             transactions = k.getTransactions(accounts=None, fromDate=firstDayOfMonth, toDate=lastDayOfMonth, minAmount=None, maxAmount=None, categorySelection=None, thepattern=None)
-            consolidated = k.getConsolidated(transactions=transactions["transactions"], byCategory="month", traceNames=["traces", "profit"], sortScatterBy='timestamp', sortScatterByReverse=True, legendonlyTraces=["Umbuchung", "Gehalt"])
-
-            transactionsByName = {}
-            for t in transactions["transactions"]:
-                if len(t["name"].strip()) == 0 and t["amount"] == 0:
-                    continue
-                if t["name"] not in transactionsByName:
-                    transactionsByName[t["name"]] = 0
-                transactionsByName[t["name"]] = transactionsByName[t["name"]] + t["amount"]
-            transactionsList = []
-            for tname, tvalue in sorted(transactionsByName.items(), key=lambda kk: kk[1]):
-                transactionsList.append({"name": tname, "sum": "{:.2f}".format(tvalue)})
-            transactionsByNameOverview[monthString] = transactionsList
-
-            coList = []
-            profit = None
-            for trace in consolidated["traces"]:
-                category = trace["name"]
-                assert(len(trace["x"]) <= 1)
-                for i in range(0, len(trace["x"])):
-                    x = trace["x"][i]
-                    y = trace["y"][i]
-                    if category == "Gewinn":
-                        assert(profit is None)
-                        profit = "{:.2f}".format(y)
-                    else:
-                        coList.append({"category": category, "sumint": y, "sum": "{:.2f}".format(y)})
-            categoryOverview[monthString] = sorted(coList, key=lambda co: co["sumint"])
-            profitOverview[monthString] = profit
-
-            for rule in rules:
-                sum = 0
-                for transaction in transactions["transactions"]:
-                    if rule['compiledPattern'].search(transaction[rule['field']]):
-                        sum += transaction["amount"]
-                if sum < rule["expectedValue"]:
-                    result[monthString].append({"type": "warning", "category": rule["category"], "current": "{:.2f}".format(sum), "expectedint": rule["expectedValue"], "expected": "{:.2f}".format(rule["expectedValue"])})
-                else:
-                    result[monthString].append({"type": "ok", "category": rule["category"], "current": "{:.2f}".format(sum), "expectedint": rule["expectedValue"], "expected": "{:.2f}".format(rule["expectedValue"])})
-            result[monthString] = sorted(result[monthString], key=lambda rr: rr["expectedint"], reverse=True)
+            consolidated = k.getConsolidated(transactions=transactions["transactions"], groupBy="month", traceNames=["traces", "nametraces", "profit"], sortScatterBy='timestamp', sortScatterByReverse=True, legendonlyTraces=["transfer", "income"])
+            aggregatedDetails[monthString] = {}
+            aggregatedDetails[monthString]["validatedRules"] = k.validateRules(transactions=transactions)
+            preparedTraces = _prepareTraces(traces=consolidated["traces"]["traces"], nametraces=consolidated["traces"]["nametraces"])
+            aggregatedDetails[monthString]["transactionsByName"] = preparedTraces["transactionsByName"]
+            aggregatedDetails[monthString]["transactionsByCategory"] = preparedTraces["transactionsByCategory"]
 
         firstDayOfMonth = firstDayOfMonth - dateutil.relativedelta.relativedelta(months=1)
 
-    return template('check.tpl', site="check", months=result, includeHeader=includeHeader, profitOverview=profitOverview, categoryOverview=categoryOverview, transactionsByNameOverview=transactionsByNameOverview)
+    return template('check.tpl', site="check", aggregatedDetails=aggregatedDetails, includeHeader=includeHeader)
 
 
 @app.route('/uploadCSV', method='GET')

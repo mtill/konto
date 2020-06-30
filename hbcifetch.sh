@@ -1,25 +1,17 @@
 #!/bin/bash
 
 
-tmpfile="/tmp/dkb.cbx"
-pnfile="bnk.png"
-
-if [ -e "$tmpfile" ]; then
- rm $tmpfile
-fi
-
-fromdate="--fromdate=$(date --date='-59 days' '+%Y%m%d')"
+allparam=""
 if [ "$1" == "all" ]; then
-  fromdate=""
+  allparam="all"
 fi
+set -o pipefail
 
-aqbanking-cli -P $pnfile request -b <BLZ> -a <ACCOUNT> $fromdate -c $tmpfile --transactions
-if [ $? -ne 0 ]; then
- rm "$tmpfile"
- exit 1
-fi
-
+/home/pi/konto/hbciMail/dkb.sh $allparam
 if [ $? -eq 0 ]; then
-  ./hbciimport.py
+  /home/pi/konto/hbciMail/bbb.sh $allparam
+  if [ $? -eq 0 ]; then
+    /home/pi/konto/hbciimport.py
+  fi
 fi
-rm "$tmpfile"
+rm /tmp/bbb.cbx

@@ -26,7 +26,7 @@ class KontoModel:
     def close(self):
         self.conn.close()
 
-    def findCategory(self, theitem, categories, unknownCategory='nicht kategorisiert'):
+    def findCategory(self, theitem, categories, unknownCategory='not categorized'):
         for category in categories:
             if category['compiledPattern'].search(theitem[category['field']]):
                 return category['category']
@@ -171,103 +171,123 @@ class KontoModel:
         result = q.fetchall()
         return [i[0] for i in result]
 
-    def getConsolidated(self, transactions, byCategory, traceNames, sortScatterBy='timestamp', sortScatterByReverse=False, legendonlyTraces=None):
+    def _buildTrace(self, thetrace, key, dateValueDict, legendonlyTraces):
+        if legendonlyTraces is not None and key in legendonlyTraces:
+            thetrace["visible"] = "legendonly"
+        for tracekey in sorted(dateValueDict.keys()):
+            thetrace['x'].append(tracekey)
+            thetrace['y'].append(dateValueDict[tracekey])
+
+    def _buildSumTrace(self, thetrace, key, dateValueDict, legendonlyTraces):
+        if legendonlyTraces is not None and key in legendonlyTraces:
+            thetrace["visible"] = "legendonly"
+        lastval = 0.0
+        for tracekey in sorted(dateValueDict.keys()):
+            thetrace['x'].append(tracekey)
+            lastval = lastval + dateValueDict[tracekey]
+            thetrace['y'].append(lastval)
+
+    def getConsolidated(self, transactions, groupBy, traceNames, sortScatterBy='timestamp', sortScatterByReverse=False, legendonlyTraces=None):
         scatterlist = []
         sumdict = {}
         incomedict = {}
-        allcategories = {}
+        keyMap = {"category": {},
+                  "name": {}
+                 }
 
         for f in transactions:
             thedate = datetime.datetime.fromtimestamp(f['timestamp'])
-            theX = thedate.strftime('%Y-%m-%d')
 
-            if byCategory == 'month' or byCategory == 'profit':
-                theX = theX[0:7]
-            elif byCategory == 'year':
-                theX = theX[0:4]
+            theX = None
+            if groupBy == 'week':
+                theX = thedate.strftime('%G-week %V')
+            elif groupBy == 'month':
+                theX = thedate.strftime('%Y-%m')
+            elif groupBy == 'quarter':
+                theX = str(thedate.strftime('%Y')) + "-quarter " + str(((thedate.month-1)//3)+1)
+            elif groupBy == 'year':
+                theX = thedate.strftime('%Y')
+            else:
+                theX = thedate.strftime('%Y-%m-%d')
 
             f['theX'] = theX
             scatterlist.append(f)
 
             if theX not in sumdict:
-                sumdict[theX] = 0
+                sumdict[theX] = 0.0
             sumdict[theX] += f['amount']
 
-            if f['category'] not in allcategories:
-                allcategories[f['category']] = {}
-            xy = f['amount']
-            if theX in allcategories[f['category']]:
-                xy = xy + allcategories[f['category']][theX]
-            allcategories[f['category']][theX] = xy
+            for keyToMap in keyMap.keys():
+                if keyToMap not in f:
+                    break
+
+                fkey = f[keyToMap]
+                if fkey not in keyMap[keyToMap]:
+                    keyMap[keyToMap][fkey] = {}
+                xy = f['amount']
+                if theX in keyMap[keyToMap][fkey]:
+                    xy = xy + keyMap[keyToMap][fkey][theX]
+                keyMap[keyToMap][fkey][theX] = xy
+
 
             if f['amount'] > 0:
                 if theX not in incomedict:
-                    incomedict[theX] = 0
+                    incomedict[theX] = 0.0
                 incomedict[theX] += f['amount']
 
 
-        traces = []
+        traces = {}
         if 'profit' in traceNames:
-            profit = {'x': [], 'y': [], 'name': 'Gewinn', 'type': 'scatter', 'line': {'color': 'red', 'dash': 'dot'}}
-            for key in sorted(sumdict.keys()):
-                profit['x'].append(key)
-                profit['y'].append(sumdict[key])
-            traces.append(profit)
+            profit = {'x': [], 'y': [], 'name': 'profit', 'type': 'scatter', 'line': {'color': 'red', 'dash': 'dot'}}
+            self._buildTrace(thetrace=profit, key="profit", dateValueDict=sumdict, legendonlyTraces=legendonlyTraces)
+            traces["profit"] = [profit]
 
-        if 'totalprofit' in traceNames:
-            totalprofit = {'x': [], 'y': [], 'name': 'Gewinn aufsummiert', 'type': 'scatter', 'line': {'dash': 'dot'}}
-            totalsum = 0
-            for key in sorted(sumdict.keys()):
-                totalprofit['x'].append(key)
-                totalsum = totalsum + sumdict[key]
-                totalprofit['y'].append(totalsum)
-            traces.append(totalprofit)
-
-        if 'catsum' in traceNames:
-            catsumtrace = {'x': [], 'y': [], 'name': 'Durchschnitt', 'type': 'bar'}
-            for key in sorted(allcategories.keys(), key=lambda x: x.lower()):
-                catsumtrace['x'].append(key)
-                thissum = 0
-                for a in allcategories[key].keys():
-                    thissum += allcategories[key][a]
-                catsumtrace['y'].append(thissum)
-            traces.append(catsumtrace)
+        if 'profitaccumulated' in traceNames:
+            profitaccumulated = {'x': [], 'y': [], 'name': 'profit (accumulated)', 'type': 'scatter', 'line': {'dash': 'dot'}}
+            self._buildSumTrace(thetrace=profitaccumulated, key="profitaccumulated", dateValueDict=sumdict, legendonlyTraces=legendonlyTraces)
+            traces["profitaccumulated"] = [profitaccumulated]
 
         if 'income' in traceNames:
-            income = {'x': [], 'y': [], 'name': 'Einkommen', 'type': 'scatter'}
-            for key in sorted(incomedict.keys()):
-                income['x'].append(key)
-                income['y'].append(incomedict[key])
-            traces.append(income);
+            income = {'x': [], 'y': [], 'name': 'income', 'type': 'scatter'}
+            self._buildTrace(thetrace=income, key="income", dateValueDict=incomedict, legendonlyTraces=legendonlyTraces)
+            traces["income"] = [income]
+
+        if 'incomeaccumulated' in traceNames:
+            incomeaccumulated = {'x': [], 'y': [], 'name': 'income', 'type': 'scatter'}
+            self._buildSumTrace(thetrace=incomeaccumulated, key="incomeaccumulated", dateValueDict=incomedict, legendonlyTraces=legendonlyTraces)
+            traces["incomeaccumulated"] = [incomeaccumulated]
 
         if 'traces' in traceNames:
-            for key in sorted(allcategories.keys(), key=lambda x: x.lower()):
-                thetrace = {'x': [],
-                            'y': [],
-                            'name': key,
-                            'type': 'bar'}
-                if legendonlyTraces is not None and key in legendonlyTraces:
-                    thetrace["visible"] = "legendonly"
-                for tracekey in sorted(allcategories[key].keys()):
-                    thetrace['x'].append(tracekey)
-                    thetrace['y'].append(allcategories[key][tracekey])
-                traces.append(thetrace)
+            tracesList = []
+            for key in sorted(keyMap["category"].keys(), key=lambda x: x.lower()):
+                thetrace = {'x': [], 'y': [], 'name': key, 'type': 'bar'}
+                self._buildTrace(thetrace=thetrace, key=key, dateValueDict=keyMap["category"][key], legendonlyTraces=legendonlyTraces)
+                tracesList.append(thetrace)
+            traces["traces"] = tracesList
 
-        if 'tracessum' in traceNames:
-            for key in sorted(allcategories.keys(), key=lambda x: x.lower()):
-                thetrace = {'x': [],
-                            'y': [],
-                            'name': key + ' aufsummiert',
-                            'type': 'scatter'}
-                if legendonlyTraces is not None and key in legendonlyTraces:
-                    thetrace["visible"] = "legendonly"
-                for tracekey in sorted(allcategories[key].keys()):
-                    thetrace['x'].append(tracekey)
-                    lastval = 0
-                    if len(thetrace['y']) != 0:
-                        lastval = thetrace['y'][-1]
-                    thetrace['y'].append(lastval + allcategories[key][tracekey])
-                traces.append(thetrace)
+        if 'tracesaccumulated' in traceNames:
+            tracesaccumulatedList = []
+            for key in sorted(keyMap["category"].keys(), key=lambda x: x.lower()):
+                thetrace = {'x': [], 'y': [], 'name': key + ' (accumulated)', 'type': 'scatter'}
+                self._buildSumTrace(thetrace=thetrace, key=key, dateValueDict=keyMap["category"][key], legendonlyTraces=legendonlyTraces)
+                tracesaccumulatedList.append(thetrace)
+            traces["tracesaccumulated"] = tracesaccumulatedList
+
+        if 'nametraces' in traceNames:
+            nametracesList = []
+            for key in sorted(keyMap["name"].keys(), key=lambda x: x.lower()):
+                thetrace = {'x': [], 'y': [], 'name': key, 'type': 'bar'}
+                self._buildTrace(thetrace=thetrace, key=key, dateValueDict=keyMap["name"][key], legendonlyTraces=legendonlyTraces)
+                nametracesList.append(thetrace)
+            traces["nametraces"] = nametracesList
+
+        if 'nametracesaccumulated' in traceNames:
+            nametracesaccumulatedList = []
+            for key in sorted(keyMap["name"].keys(), key=lambda x: x.lower()):
+                thetrace = {'x': [], 'y': [], 'name': key + ' (accumulated)', 'type': 'scatter'}
+                self._buildSumTrace(thetrace=thetrace, key=key, dateValueDict=keyMap["name"][key], legendonlyTraces=legendonlyTraces)
+                nametracesaccumulatedList.append(thetrace)
+            traces["nametracesaccumulated"] = nametracesaccumulatedList
 
         result = {'traces': traces}
         if 'scatter' in traceNames:
@@ -289,6 +309,29 @@ class KontoModel:
             result['scatter'] = scatter
 
         return result
+
+
+    def validateRules(self, transactions):
+        categories = self.parseCategories()
+        rules = []
+        for c in categories:
+            if c["expectedValue"] is not None:
+                rules.append(c)
+
+        validationOverview = []
+        for rule in rules:
+            sum = 0.0
+            for transaction in transactions["transactions"]:
+                if rule['compiledPattern'].search(transaction[rule['field']]):
+                    sum += transaction["amount"]
+            if sum < rule["expectedValue"]:
+                validationOverview.append({"type": "warning", "category": rule["category"], "current": "{:.2f}".format(sum), "expectedint": rule["expectedValue"], "expected": "{:.2f}".format(rule["expectedValue"])})
+            else:
+                validationOverview.append({"type": "ok", "category": rule["category"], "current": "{:.2f}".format(sum), "expectedint": rule["expectedValue"], "expected": "{:.2f}".format(rule["expectedValue"])})
+        validationOverview = sorted(validationOverview, key=lambda rr: rr["expectedint"], reverse=True)
+
+        return validationOverview
+
 
     def hasEntry(self, tableName, entry):
         sqlparts = []

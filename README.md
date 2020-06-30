@@ -1,5 +1,13 @@
 # konto
-web based HBCI banking software
+Web based HBCI banking software. Features:
+- visualize transactions
+- analyze how much you spent and visualize results by week, month, quarter, or year
+- categorize transactions based on regex patterns
+- monitor expenses based on validation rules ("how much money do I expect for this kind of category per month?")
+- import data from HBCI (via aqbanking-cli) or from file (CSV)
+
+## Demo
+![](demo/img/konto-demo.gif)
 
 ## how to install
 * pip3 install bottle (https://bottlepy.org/)

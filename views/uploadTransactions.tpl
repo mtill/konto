@@ -13,7 +13,7 @@
     var editable = null;
 
     function doUpload() {
-      var entries = editable.parseTable();
+      var entries = editable.parseTable("json");
 
       fetch("/uploadTransactions", {
         method: "POST",
@@ -80,6 +80,6 @@
 
 <div id="secondpage"></div>
 
-<p style="color: lightgray;margin-top: 3em;margin-left:1em">konto &mdash; &copy;<a href="https://github.com/mtill/konto" target="_blank" style="text-decoration:none;color: lightgray">Michael Till Beck</a>, 2018-2020</p>
+<p style="color: lightgray;margin-top: 3em;margin-left:1em">&copy; konto &mdash 2018-2020</p>
 </body>
 </html>
