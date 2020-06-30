@@ -7,11 +7,9 @@ if [ "$1" == "all" ]; then
 fi
 set -o pipefail
 
-/home/pi/konto/hbciMail/dkb.sh $allparam
+
+/home/pi/konto/hbciMail/bbb.sh $allparam
 if [ $? -eq 0 ]; then
-  /home/pi/konto/hbciMail/bbb.sh $allparam
-  if [ $? -eq 0 ]; then
-    /home/pi/konto/hbciimport.py
-  fi
+  /home/pi/konto/hbciimport.py
 fi
 rm /tmp/bbb.cbx
