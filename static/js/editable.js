@@ -1,3 +1,22 @@
+function compareNumbers(a, b) {
+  //console.log('a: ' + a);
+  //console.log('b: ' + b);
+  //console.log('-------');
+  if (!isNaN(a) && !isNaN(b)) {
+    return a - b;
+  }
+  // check for num vs string
+  if (!isNaN(a) && typeof b === 'string') {
+    return -1;
+  }
+  // check for string vs num
+  if (typeof a === 'string' && !isNaN(b)) {
+    return 1;
+  }
+  return a.localeCompare(b);
+}
+
+
 class Editable {
 
     constructor({thenode, keyMap, errorkey, providedActions, sortable}) {
@@ -178,7 +197,7 @@ class Editable {
 
       let s = this;
       let comp = function(a, b) {
-        return s.parseRow(a, false, false)[thekey].localeCompare(s.parseRow(b, false, false)[thekey]);
+        return compareNumbers(s.parseRow(a, false, false)[thekey], s.parseRow(b, false, false)[thekey]);
       }
       let appen = function(ele) {
         s.tbody.appendChild(ele);
